@@ -2,6 +2,19 @@
 
 This project provides tools to build an HPC cluster from scratch using Rocky Linux 9.5 as the base OS.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [System Requirements](#system-requirements)
+- [Network Configuration](#network-configuration)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Installation Methods](#installation-methods)
+- [Monitoring](#monitoring)
+- [Benchmarking](#benchmarking)
+- [Documentation](#documentation)
+- [License](#license)
+
 ## Overview
 
 The project supports building a mini HPC cluster with the following components:
@@ -94,9 +107,54 @@ HPC-Setup/
 │   ├── utils/                # Utility scripts
 │   ├── warewulf/             # Warewulf setup
 │   └── setup.sh              # Main setup script
+├── docs/                     # Documentation
+│   ├── installation.md       # Installation guide
+│   ├── monitoring.md         # Monitoring setup
+│   └── benchmarking.md       # Benchmarking guide
 ├── .gitlab-ci.yml            # GitLab CI configuration
 └── README.md                 # This file
 ```
+
+## Quick Start
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/yourusername/HPC-Setup.git
+   cd HPC-Setup
+   ```
+
+2. **Configure Network**
+   - Edit `shell/config/network.conf`
+   - Set appropriate IP addresses and network interfaces
+
+3. **Choose Installation Method**
+
+   a. **Shell Script Installation**
+   ```bash
+   cd shell
+   ./setup.sh
+   ```
+
+   b. **Ansible Installation**
+   ```bash
+   cd ansible
+   ansible-playbook -i inventory/hosts site.yml
+   ```
+
+4. **Verify Installation**
+   ```bash
+   # Check Warewulf status
+   wwctl node list
+   
+   # Check SLURM status
+   sinfo
+   
+   # Check monitoring
+   curl http://localhost:5601  # Kibana
+   curl http://localhost:3000  # Grafana
+   ```
+
+For detailed instructions, see the [Installation Guide](docs/installation.md).
 
 ## Installation Methods
 
@@ -125,14 +183,33 @@ Access the monitoring dashboards at:
 - Kibana: http://headnode:5601
 - Grafana: http://headnode:3000
 
+For detailed monitoring setup and configuration, see [Monitoring Documentation](docs/monitoring.md).
+
 ## Benchmarking
 
-The project includes automated benchmarking using GitLab CI. The benchmarks include:
-- HPL (High Performance Linpack)
-- OSU Micro-Benchmarks
-- STREAM
+The project includes automated benchmarking using GitLab CI (`.gitlab-ci.yml`). The benchmarks run automatically on a schedule or can be triggered manually through the GitLab web interface.
 
-Results are sent to a Microsoft Teams channel.
+### Benchmark Suite
+The following benchmarks are included:
+- **HPL** (High Performance Linpack)
+  - Runs on 3 nodes with 4 tasks per node
+  - 1-hour time limit
+- **OSU Micro-Benchmarks**
+  - Runs on 2 nodes with 2 tasks per node
+  - Tests: allreduce, bcast, alltoall
+  - 30-minute time limit per test
+- **STREAM**
+  - Runs on 3 nodes with 1 task per node
+  - 30-minute time limit
+
+For detailed benchmarking setup and configuration, see [Benchmarking Documentation](docs/benchmarking.md).
+
+## Documentation
+
+Detailed documentation is available in the `docs` directory:
+- [Installation Guide](docs/installation.md)
+- [Monitoring Setup](docs/monitoring.md)
+- [Benchmarking Guide](docs/benchmarking.md)
 
 ## License
 
