@@ -1,0 +1,109 @@
+---
+- name: Install EPEL repository
+  dnf:
+    name: epel-release
+    state: present
+
+- name: Import Elasticsearch GPG key
+  rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+
+- name: Add Elasticsearch repository
+  yum_repository:
+    name: elasticsearch
+    description: Elasticsearch repository
+    baseurl: https://artifacts.elastic.co/packages/7.x/yum
+    gpgcheck: yes
+    gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    enabled: yes
+
+- name: Install Elasticsearch
+  dnf:
+    name: elasticsearch
+    state: present
+    enablerepo: elasticsearch
+
+- name: Configure Elasticsearch
+  template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    mode: '0644'
+  notify: restart elasticsearch
+
+- name: Configure Elasticsearch JVM options
+  template:
+    src: jvm.options.j2
+    dest: /etc/elasticsearch/jvm.options
+    mode: '0644'
+  notify: restart elasticsearch
+
+- name: Enable and start Elasticsearch service
+  systemd:
+    name: elasticsearch
+    state: started
+    enabled: yes
+
+- name: Install Logstash
+  dnf:
+    name: logstash
+    state: present
+    enablerepo: elasticsearch
+
+- name: Configure Logstash
+  template:
+    src: logstash.yml.j2
+    dest: /etc/logstash/logstash.yml
+    mode: '0644'
+  notify: restart logstash
+
+- name: Configure Logstash pipeline
+  template:
+    src: logstash.conf.j2
+    dest: /etc/logstash/conf.d/logstash.conf
+    mode: '0644'
+  notify: restart logstash
+
+- name: Enable and start Logstash service
+  systemd:
+    name: logstash
+    state: started
+    enabled: yes
+
+- name: Install Kibana
+  dnf:
+    name: kibana
+    state: present
+    enablerepo: elasticsearch
+
+- name: Configure Kibana
+  template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    mode: '0644'
+  notify: restart kibana
+
+- name: Enable and start Kibana service
+  systemd:
+    name: kibana
+    state: started
+    enabled: yes
+
+- name: Wait for Elasticsearch to be ready
+  uri:
+    url: "http://localhost:9200"
+    method: GET
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+
+- name: Create index pattern in Kibana
+  uri:
+    url: "http://localhost:5601/api/saved_objects/index-pattern/logstash-*"
+    method: POST
+    body: '{"attributes":{"title":"logstash-*","timeFieldName":"@timestamp"}}'
+    body_format: json
+    status_code: [200, 409]
+  when: result.status == 200 

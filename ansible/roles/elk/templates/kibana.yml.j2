@@ -1,0 +1,16 @@
+server.port: 5601
+server.host: "0.0.0.0"
+
+elasticsearch.hosts: ["http://localhost:9200"]
+elasticsearch.username: "{{ elasticsearch_user }}"
+elasticsearch.password: "{{ elasticsearch_password }}"
+
+monitoring.ui.container.elasticsearch.enabled: true
+
+xpack.security.enabled: true
+xpack.security.audit.enabled: true
+
+logging.verbose: true
+logging.dest: /var/log/kibana/kibana.log
+
+pid.file: /var/run/kibana/kibana.pid 

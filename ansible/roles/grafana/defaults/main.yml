@@ -1,0 +1,16 @@
+---
+# Grafana admin user configuration
+grafana_admin_user: "admin"
+grafana_admin_password: "changeme"  # Change this in production!
+
+# Grafana server configuration
+grafana_server_port: 3000
+grafana_server_domain: "localhost"
+
+# Dashboard configuration
+grafana_dashboards_path: "/var/lib/grafana/dashboards"
+grafana_dashboards_provider: "HPC Dashboards"
+
+# Data source configuration
+grafana_elasticsearch_url: "http://localhost:9200"
+grafana_prometheus_url: "http://localhost:9090" 

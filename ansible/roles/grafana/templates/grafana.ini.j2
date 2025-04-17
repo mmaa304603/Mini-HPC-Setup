@@ -1,0 +1,31 @@
+[server]
+http_port = 3000
+domain = {{ inventory_hostname }}
+root_url = %(protocol)s://%(domain)s:%(http_port)s/
+serve_from_sub_path = false
+
+[security]
+admin_user = {{ grafana_admin_user }}
+admin_password = {{ grafana_admin_password }}
+
+[auth.anonymous]
+enabled = false
+
+[users]
+allow_sign_up = false
+
+[dashboards]
+min_refresh_interval = 5s
+
+[paths]
+data = /var/lib/grafana
+logs = /var/log/grafana
+plugins = /var/lib/grafana/plugins
+
+[log]
+mode = file
+level = info
+files = /var/log/grafana/grafana.log
+
+[snapshots]
+external_enabled = true 

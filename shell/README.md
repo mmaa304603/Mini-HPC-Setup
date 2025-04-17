@@ -199,3 +199,6 @@ SPACK_PACKAGES=(
 ### Customizing Module Files
 
 To customize the module files, edit the `configure_modules` function in `modules/install.sh`. You can add new modulefiles or modify existing ones to suit your needs. 
+
+[monitoring]
+monitor01 ansible_host=192.168.1.20 
