@@ -1,71 +1,82 @@
 #!/bin/bash
 
-# Source configuration
-source "$(dirname "$0")/config.sh"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-# Logging functions
-log() {
-    local level=$1
-    shift
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" | tee -a "$LOG_FILE"
+# Log directory
+LOG_DIR="/var/log/hpc-setup"
+
+# Print info message
+info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-info() { log "INFO" "$*"; }
-error() { log "ERROR" "$*"; }
-warn() { log "WARN" "$*"; }
+# Print warning message
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+# Print error message
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
 
 # Check if running as root
 check_root() {
-    if [ "$(id -u)" != "0" ]; then
+    if [ "$EUID" -ne 0 ]; then
         error "This script must be run as root"
         exit 1
     fi
 }
 
-# Check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+# Create directory if it doesn't exist
+ensure_dir() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+    fi
 }
 
-# Install package if not present
-install_package() {
-    local package=$1
-    if ! command_exists "$package"; then
-        info "Installing $package..."
-        dnf install -y "$package" || {
-            error "Failed to install $package"
-            return 1
-        }
-    else
-        info "$package is already installed"
+# Backup file if it exists
+backup_file() {
+    if [ -f "$1" ]; then
+        cp "$1" "$1.bak"
     fi
+}
+
+# Install package using dnf
+install_package() {
+    info "Installing package: $1"
+    dnf install -y "$1" || {
+        error "Failed to install package: $1"
+        return 1
+    }
+}
+
+# Start and enable service
+start_service() {
+    info "Starting service: $1"
+    systemctl enable --now "$1" || {
+        error "Failed to start service: $1"
+        return 1
+    }
 }
 
 # Configure firewall
 configure_firewall() {
-    local port=$1
-    local service=$2
-    info "Configuring firewall for $service on port $port..."
-    firewall-cmd --permanent --add-port="$port/tcp" || {
-        error "Failed to add port $port to firewall"
+    info "Configuring firewall for port: $1"
+    firewall-cmd --permanent --add-port="$1/tcp" || {
+        error "Failed to configure firewall for port: $1"
         return 1
     }
-    firewall-cmd --reload || {
-        error "Failed to reload firewall"
-        return 1
-    }
+    firewall-cmd --reload
 }
 
-# Create directory if it doesn't exist
-ensure_dir() {
-    local dir=$1
-    if [ ! -d "$dir" ]; then
-        info "Creating directory $dir..."
-        mkdir -p "$dir" || {
-            error "Failed to create directory $dir"
-            return 1
-        }
-    fi
+# Check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
 # Backup a file
@@ -85,20 +96,6 @@ backup_file() {
 service_running() {
     local service=$1
     systemctl is-active --quiet "$service"
-}
-
-# Start and enable a service
-start_service() {
-    local service=$1
-    info "Starting and enabling $service..."
-    systemctl enable "$service" || {
-        error "Failed to enable $service"
-        return 1
-    }
-    systemctl start "$service" || {
-        error "Failed to start $service"
-        return 1
-    }
 }
 
 # Execute command on remote node

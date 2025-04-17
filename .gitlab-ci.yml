@@ -1,0 +1,50 @@
+stages:
+  - benchmark
+
+variables:
+  SLURM_CLUSTER: hpc-cluster
+  TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL}
+
+benchmark:
+  stage: benchmark
+  script:
+    - |
+      #!/bin/bash
+      
+      # Load required modules
+      module load openmpi
+      module load hpl
+      module load osu-micro-benchmarks
+      module load stream
+      
+      # Run HPL benchmark
+      srun --partition=normal --nodes=3 --ntasks-per-node=4 --time=01:00:00 hpl
+      
+      # Run OSU benchmarks
+      srun --partition=normal --nodes=2 --ntasks-per-node=2 --time=00:30:00 osu_allreduce
+      srun --partition=normal --nodes=2 --ntasks-per-node=2 --time=00:30:00 osu_bcast
+      srun --partition=normal --nodes=2 --ntasks-per-node=2 --time=00:30:00 osu_alltoall
+      
+      # Run STREAM benchmark
+      srun --partition=normal --nodes=3 --ntasks-per-node=1 --time=00:30:00 stream
+      
+      # Send results to Microsoft Teams
+      curl -H "Content-Type: application/json" -d "{
+        \"@type\": \"MessageCard\",
+        \"@context\": \"http://schema.org/extensions\",
+        \"themeColor\": \"0072C6\",
+        \"summary\": \"HPC Benchmark Results\",
+        \"sections\": [{
+          \"activityTitle\": \"HPC Benchmark Results\",
+          \"activitySubtitle\": \"Benchmark run completed on $(date)\",
+          \"facts\": [{
+            \"name\": \"Status\",
+            \"value\": \"Completed\"
+          }]
+        }]
+      }" $TEAMS_WEBHOOK_URL
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+  tags:
+    - hpc 

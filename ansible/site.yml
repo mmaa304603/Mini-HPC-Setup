@@ -1,13 +1,88 @@
 ---
-- name: Configure HPC Head Node
+- name: HPC Cluster Setup
+  hosts: all
+  become: true
+  vars_files:
+    - vars/main.yml
+  
+  pre_tasks:
+    - name: Include checkpoint role
+      include_role:
+        name: checkpoint
+      vars:
+        checkpoint_name: "initial_setup"
+    
+    - name: Check if initial setup is complete
+      include_role:
+        name: checkpoint
+      vars:
+        checkpoint_name: "initial_setup"
+      register: initial_checkpoint
+      when: not skip_initial_setup | default(false)
+  
+  roles:
+    - role: common
+      when: not skip_initial_setup | default(false) or initial_checkpoint is failed
+    
+    - role: network
+      when: network_setup_enabled | default(true)
+      vars:
+        checkpoint_name: "network_setup"
+    
+    - role: slurm
+      when: slurm_enabled | default(true)
+      vars:
+        checkpoint_name: "slurm_setup"
+    
+    - role: spack
+      when: spack_enabled | default(true)
+      vars:
+        checkpoint_name: "spack_setup"
+    
+    - role: monitoring
+      when: monitoring_enabled | default(true)
+      vars:
+        checkpoint_name: "monitoring_setup"
+  
+  post_tasks:
+    - name: List all checkpoints
+      include_role:
+        name: checkpoint
+      vars:
+        list_checkpoints: true
+      when: list_checkpoints | default(false)
+    
+    - name: Clear specific checkpoint
+      include_role:
+        name: checkpoint
+      vars:
+        checkpoint_name: "{{ clear_checkpoint_name }}"
+        clear_checkpoint: true
+      when: clear_checkpoint_name is defined
+    
+    - name: Clear all checkpoints
+      include_role:
+        name: checkpoint
+      vars:
+        clear_all_checkpoints: true
+      when: clear_all_checkpoints | default(false)
+
+- name: Configure Head Node
   hosts: headnode
   become: true
   roles:
-    - warewulf
-    - slurm
+    - network
+    - warewulf_server
+    - slurm_controller
+    - spack_server
+    - elk
+    - grafana
 
-- name: Configure HPC Compute Nodes
+- name: Configure Compute Nodes
   hosts: computenodes
   become: true
   roles:
-    - slurm 
+    - warewulf_client
+    - slurm_compute
+    - spack_client
+    - monitoring_client 

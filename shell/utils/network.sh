@@ -1,90 +1,62 @@
 #!/bin/bash
 
-# Source common functions
+# Source common functions and configuration
 source "$(dirname "$0")/../common/functions.sh"
-
-# Check if running as root
-check_root
+source "$(dirname "$0")/../common/config.sh"
 
 # Configure network interface
 configure_network() {
-    local interface=$1
-    local ip=$2
-    local netmask=$3
-
-    info "Configuring network interface $interface..."
+    info "Configuring network interface $NETWORK_INTERFACE..."
     
-    # Backup existing network configuration
-    backup_file "/etc/sysconfig/network-scripts/ifcfg-$interface"
-    
-    # Create new network configuration
-    cat > "/etc/sysconfig/network-scripts/ifcfg-$interface" << EOF
-DEVICE=$interface
+    # Create network configuration file
+    cat > "/etc/sysconfig/network-scripts/ifcfg-$NETWORK_INTERFACE" << EOF
+DEVICE=$NETWORK_INTERFACE
 BOOTPROTO=static
-IPADDR=$ip
-NETMASK=$netmask
+IPADDR=$HEAD_NODE_IP
+NETMASK=$NETWORK_MASK
 ONBOOT=yes
 TYPE=Ethernet
 EOF
-
+    
     # Restart network service
-    systemctl restart network || {
-        error "Failed to restart network service"
-        return 1
-    }
+    systemctl restart network
+    
+    info "Network interface configured successfully"
 }
 
-# Configure DHCP server
-configure_dhcp() {
-    info "Configuring DHCP server..."
+# Configure firewall
+configure_firewall() {
+    if [ "$FIREWALL_ENABLED" != "true" ]; then
+        info "Firewall configuration is disabled"
+        return 0
+    fi
     
-    # Install DHCP server
-    install_package "dhcp-server"
+    info "Configuring firewall..."
     
-    # Backup existing DHCP configuration
-    backup_file "/etc/dhcp/dhcpd.conf"
+    # Allow required services
+    for service in "${FIREWALL_SERVICES[@]}"; do
+        info "Adding service to firewall: $service"
+        firewall-cmd --permanent --add-service="$service"
+    done
     
-    # Create new DHCP configuration
-    cat > "/etc/dhcp/dhcpd.conf" << EOF
-default-lease-time 600;
-max-lease-time 7200;
-
-subnet $NETWORK netmask $NETWORK_MASK {
-    range $DHCP_START $DHCP_END;
-    option routers $HEAD_NODE_IP;
-    option domain-name-servers $HEAD_NODE_IP;
-    option domain-name "$SLURM_CLUSTER_NAME";
-}
-EOF
-
-    # Start and enable DHCP service
-    start_service "dhcpd"
-}
-
-# Configure TFTP server
-configure_tftp() {
-    info "Configuring TFTP server..."
+    # Allow required ports
+    for port in "${FIREWALL_PORTS[@]}"; do
+        info "Adding port to firewall: $port"
+        firewall-cmd --permanent --add-port="$port/tcp"
+    done
     
-    # Install TFTP server
-    install_package "tftp-server"
+    # Reload firewall
+    firewall-cmd --reload
     
-    # Configure firewall for TFTP
-    configure_firewall "69" "tftp"
-    
-    # Start and enable TFTP service
-    start_service "tftp"
+    info "Firewall configured successfully"
 }
 
 # Main execution
 main() {
-    ensure_dir "$LOG_DIR"
+    check_root
     
-    # Configure head node network
-    configure_network "$NETWORK_INTERFACE" "$HEAD_NODE_IP" "$NETWORK_MASK"
-    
-    # Configure DHCP and TFTP servers
-    configure_dhcp
-    configure_tftp
+    configure_network
+    configure_firewall
     
     info "Network configuration completed successfully"
 }

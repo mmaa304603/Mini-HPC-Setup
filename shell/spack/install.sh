@@ -1,131 +1,71 @@
 #!/bin/bash
 
-# Source common functions
+# Source common functions and configuration
 source "$(dirname "$0")/../common/functions.sh"
+source "$(dirname "$0")/../common/config.sh"
 
-# Check if running as root
-check_root
-
-# Install dependencies for Spack
-install_spack_dependencies() {
-    info "Installing Spack dependencies..."
-    
-    local packages=(
-        "git"
-        "gcc"
-        "gcc-c++"
-        "make"
-        "cmake"
-        "python3"
-        "python3-pip"
-        "environment-modules"
-    )
-    
-    for package in "${packages[@]}"; do
-        install_package "$package"
-    done
-}
-
-# Clone and install Spack
+# Install Spack
 install_spack() {
     info "Installing Spack..."
     
-    # Create Spack installation directory
-    ensure_dir "$SPACK_INSTALL_DIR"
-    
     # Clone Spack repository
-    if [ ! -d "$SPACK_INSTALL_DIR/.git" ]; then
-        info "Cloning Spack repository..."
-        git clone -b "$SPACK_BRANCH" "$SPACK_REPO" "$SPACK_INSTALL_DIR" || {
-            error "Failed to clone Spack repository"
-            return 1
+    git clone https://github.com/spack/spack.git "$SPACK_ROOT"
+    
+    # Set up environment
+    cat > "$SPACK_ENV_FILE" << EOF
+export SPACK_ROOT=$SPACK_ROOT
+export PATH=\$SPACK_ROOT/bin:\$PATH
+EOF
+    
+    source "$SPACK_ENV_FILE"
+    
+    info "Spack installed successfully"
+}
+
+# Install common packages
+install_packages() {
+    info "Installing common packages..."
+    
+    # Install packages from configuration
+    for package in "${PACKAGES[@]}"; do
+        info "Installing package: $package"
+        spack install "$package" || {
+            warn "Failed to install package: $package"
         }
-    else
-        info "Spack repository already exists, updating..."
-        cd "$SPACK_INSTALL_DIR" && git pull || {
-            error "Failed to update Spack repository"
-            return 1
-        }
+    done
+    
+    info "Common packages installed successfully"
+}
+
+# Configure environment modules
+configure_modules() {
+    if [ "$MODULES_ENABLED" != "true" ]; then
+        info "Environment modules configuration is disabled"
+        return 0
     fi
     
-    # Create Spack environment file
-    cat > /etc/profile.d/spack.sh << EOF
-# Spack environment setup
-export SPACK_ROOT=$SPACK_INSTALL_DIR
-source \$SPACK_ROOT/share/spack/setup-env.sh
-EOF
-    chmod +x /etc/profile.d/spack.sh
+    info "Configuring environment modules..."
     
-    # Source Spack environment
-    source /etc/profile.d/spack.sh
-    
-    # Configure Spack
-    configure_spack
-}
-
-# Configure Spack
-configure_spack() {
-    info "Configuring Spack..."
-    
-    # Add compilers
-    for compiler in "${SPACK_COMPILERS[@]}"; do
-        info "Adding compiler $compiler..."
-        spack compiler find "$compiler" || {
-            warn "Failed to add compiler $compiler"
-        }
-    done
-    
-    # Configure Spack to use system packages when possible
-    spack config add "packages:all:buildable:False"
-    spack config add "packages:all:externals:[]"
-    
-    # Configure Spack to use system compilers
-    spack config add "compilers:all:paths:cc:/usr/bin/gcc"
-    spack config add "compilers:all:paths:cxx:/usr/bin/g++"
-    spack config add "compilers:all:paths:f77:/usr/bin/gfortran"
-    spack config add "compilers:all:paths:fc:/usr/bin/gfortran"
-    
-    # Configure Spack to use system MPI
-    spack config add "packages:openmpi:externals:[]"
-    
-    # Configure Spack to use system Python
-    spack config add "packages:python:externals:[]"
-}
-
-# Install Spack packages
-install_spack_packages() {
-    info "Installing Spack packages..."
-    
-    # Source Spack environment
-    source /etc/profile.d/spack.sh
-    
-    # Install packages
-    for package in "${SPACK_PACKAGES[@]}"; do
-        info "Installing package $package..."
-        spack install "$package" || {
-            error "Failed to install package $package"
-            return 1
-        }
-    done
+    # Enable environment modules
+    spack config add "modules:enable:$MODULES_TYPE"
     
     # Generate module files
-    spack module tcl refresh -y
+    if [ "$MODULES_REFRESH" = "true" ]; then
+        spack module "$MODULES_TYPE" refresh
+    fi
+    
+    info "Environment modules configured successfully"
 }
 
 # Main execution
 main() {
-    ensure_dir "$LOG_DIR"
+    check_root
     
-    # Install dependencies
-    install_spack_dependencies
-    
-    # Install Spack
     install_spack
+    install_packages
+    configure_modules
     
-    # Install packages
-    install_spack_packages
-    
-    info "Spack installation completed successfully"
+    info "Spack installation and configuration completed successfully"
 }
 
 main "$@" 

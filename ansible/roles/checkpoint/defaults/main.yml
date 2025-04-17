@@ -1,0 +1,9 @@
+---
+# Checkpoint directory
+checkpoint_dir: "{{ log_dir }}/checkpoints"
+
+# Checkpoint operations
+checkpoint_name: ""
+list_checkpoints: false
+clear_checkpoint: false
+clear_all_checkpoints: false 

@@ -1,0 +1,58 @@
+---
+# Initialize checkpoint directory
+- name: Create checkpoint directory
+  file:
+    path: "{{ checkpoint_dir }}"
+    state: directory
+    mode: '0755'
+  register: checkpoint_dir_created
+
+# Create checkpoint
+- name: Create checkpoint file
+  copy:
+    content: "{{ ansible_date_time.iso8601 }}"
+    dest: "{{ checkpoint_dir }}/{{ checkpoint_name }}.checkpoint"
+    mode: '0644'
+  when: checkpoint_dir_created is success
+  register: checkpoint_created
+
+# Verify checkpoint exists
+- name: Check if checkpoint exists
+  stat:
+    path: "{{ checkpoint_dir }}/{{ checkpoint_name }}.checkpoint"
+  register: checkpoint_stat
+
+# List all checkpoints
+- name: List all checkpoints
+  find:
+    paths: "{{ checkpoint_dir }}"
+    patterns: "*.checkpoint"
+  register: checkpoint_list
+  when: list_checkpoints | default(false)
+
+- name: Display checkpoints
+  debug:
+    msg: "Checkpoint: {{ item.path | basename }} created at {{ lookup('file', item.path) }}"
+  loop: "{{ checkpoint_list.files }}"
+  when: list_checkpoints | default(false)
+
+# Clear checkpoint
+- name: Remove checkpoint file
+  file:
+    path: "{{ checkpoint_dir }}/{{ checkpoint_name }}.checkpoint"
+    state: absent
+  when: clear_checkpoint | default(false)
+
+# Clear all checkpoints
+- name: Remove all checkpoint files
+  file:
+    path: "{{ checkpoint_dir }}"
+    state: absent
+  when: clear_all_checkpoints | default(false)
+
+- name: Recreate checkpoint directory
+  file:
+    path: "{{ checkpoint_dir }}"
+    state: directory
+    mode: '0755'
+  when: clear_all_checkpoints | default(false) 

@@ -3,90 +3,47 @@
 # Source common functions
 source "$(dirname "$0")/../common/functions.sh"
 
-# Check if running as root
-check_root
-
-# Install EPEL repository
-install_epel() {
-    info "Installing EPEL repository..."
-    install_package "epel-release"
+# Install Warewulf
+install_warewulf() {
+    info "Installing Warewulf..."
+    
+    # Add Warewulf repository
+    dnf install -y epel-release
+    dnf install -y https://github.com/hpcng/warewulf/releases/download/v4.6.0/warewulf-4.6.0.el9.x86_64.rpm
+    
+    # Install required packages
+    dnf install -y tftp-server dhcp-server nfs-utils
+    
+    info "Warewulf installed successfully"
 }
 
-# Install Warewulf repository
-install_warewulf_repo() {
-    info "Installing Warewulf repository..."
+# Configure Warewulf
+configure_warewulf() {
+    info "Configuring Warewulf..."
     
-    local repo_url="https://warewulf.org/downloads/warewulf-release-${WAREWULF_VERSION}.el8.noarch.rpm"
-    local repo_file="/tmp/warewulf-release.rpm"
+    # Copy configuration file
+    cp "$(dirname "$0")/warewulf.conf" /etc/warewulf/warewulf.conf
     
-    # Download repository package
-    curl -L "$repo_url" -o "$repo_file" || {
-        error "Failed to download Warewulf repository package"
-        return 1
-    }
+    # Initialize Warewulf
+    wwctl configure --all
     
-    # Install repository package
-    dnf install -y "$repo_file" || {
-        error "Failed to install Warewulf repository package"
-        return 1
-    }
+    # Start and enable services
+    systemctl enable --now warewulfd
+    systemctl enable --now dhcpd
+    systemctl enable --now tftp
+    systemctl enable --now nfs-server
     
-    # Clean up
-    rm -f "$repo_file"
-}
-
-# Install Warewulf packages
-install_warewulf_packages() {
-    info "Installing Warewulf packages..."
-    
-    local packages=(
-        "warewulf-server"
-        "warewulf-client"
-        "warewulf-common"
-    )
-    
-    for package in "${packages[@]}"; do
-        install_package "$package"
-    done
-}
-
-# Configure firewall for Warewulf
-configure_warewulf_firewall() {
-    info "Configuring firewall for Warewulf..."
-    configure_firewall "$WAREWULF_PORT" "warewulf"
-}
-
-# Start Warewulf services
-start_warewulf_services() {
-    info "Starting Warewulf services..."
-    
-    local services=(
-        "warewulfd"
-        "dhcpd"
-        "tftp"
-    )
-    
-    for service in "${services[@]}"; do
-        start_service "$service"
-    done
+    info "Warewulf configured successfully"
 }
 
 # Main execution
 main() {
-    ensure_dir "$LOG_DIR"
+    check_root
     
-    # Install dependencies
-    install_epel
-    install_warewulf_repo
-    install_warewulf_packages
+    install_warewulf
+    configure_warewulf
     
-    # Configure firewall
-    configure_warewulf_firewall
-    
-    # Start services
-    start_warewulf_services
-    
-    info "Warewulf installation completed successfully"
+    info "Warewulf installation and configuration completed successfully"
 }
 
 main "$@" 
