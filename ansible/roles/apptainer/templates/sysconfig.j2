@@ -1,0 +1,20 @@
+# System-wide Apptainer configuration
+
+# Default bind paths
+APPTAINER_BIND_PATH="{{ apptainer_bind_paths | join(',') }}"
+
+# Allow unprivileged users to use FUSE mounts
+APPTAINER_ALLOW_FUSEMOUNT={% if apptainer_allow_fusemount %}1{% else %}0{% endif %}
+
+# Enable container overlay support
+APPTAINER_ENABLE_OVERLAY={% if apptainer_enable_overlay %}1{% else %}0{% endif %}
+
+# Cache directory
+APPTAINER_CACHEDIR="{{ apptainer_cache_dir }}"
+
+# Temp directory
+APPTAINER_TMPDIR="/tmp"
+
+# Allow users to use GPU devices
+APPTAINER_NV={% if apptainer_enable_nv %}1{% else %}0{% endif %}
+APPTAINER_ROCM={% if apptainer_enable_rocm %}1{% else %}0{% endif %} 

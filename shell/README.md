@@ -1,29 +1,120 @@
-# HPC Cluster Shell Scripts
+# Shell Script Installation
 
-This directory contains shell scripts for manually setting up an HPC cluster using Rocky Linux, Warewulf, SLURM, Spack, and Environment Modules.
+This directory contains shell scripts for installing and configuring the HPC cluster components.
+
+## Installation Order
+
+For a cluster with Radax X2L nodes where only the head node has SSD storage and worker nodes rely on PXE boot, the installation must follow this specific order:
+
+1. **Head Node Setup**: Install Rocky Linux 9.5 on the head node
+2. **Network Configuration**: Configure the network interface for PXE boot
+3. **Warewulf Installation**: Install and configure Warewulf 4.6 on the head node
+4. **Container Creation**: Create the container for compute nodes
+5. **Compute Node Provisioning**: Configure PXE boot for compute nodes
+6. **Compute Node Boot**: Boot the compute nodes using PXE
+7. **SLURM Installation**: Install SLURM on the head node and configure it to manage compute nodes
+8. **Additional Software**: Install Spack, Environment Modules, monitoring tools, etc.
+
+## Installation Steps
+
+```bash
+# 1. Install Rocky Linux 9.5 on the head node (manual step)
+# 2. Clone this repository on the head node
+git clone https://github.com/yourusername/HPC-Setup.git
+cd HPC-Setup/shell
+
+# 3. Configure the head node's network interface
+# This step sets up the head node's network interface (enp2s0) with:
+# - Static IP (10.0.0.1)
+# - Network mask (/22)
+# - Disable NetworkManager for the provisioning interface
+./setup.sh --step network
+
+# 4. Install and configure Warewulf
+# This step will:
+# - Install Warewulf 4.6
+# - Configure DHCP server for PXE boot (10.0.1.x range)
+# - Set up TFTP and HTTP services
+# - Configure container image
+./setup.sh --step warewulf
+
+# 5. Boot the compute nodes (manual step - power on the nodes)
+# 6. Install SLURM
+./setup.sh --step slurm
+
+# 7. Install additional software
+./setup.sh --step spack
+./setup.sh --step modules
+./setup.sh --step monitoring
+./setup.sh --step squid
+./setup.sh --step apptainer
+```
 
 ## Directory Structure
 
 ```
 shell/
-├── common/           # Common functions and utilities
-│   ├── functions.sh  # Shared shell functions
-│   └── config.sh     # Configuration variables
-├── warewulf/         # Warewulf installation and configuration
-│   ├── install.sh    # Install Warewulf and dependencies
-│   └── configure.sh  # Configure Warewulf settings
-├── slurm/            # SLURM installation and configuration
-│   ├── install.sh    # Install SLURM and dependencies
-│   └── configure.sh  # Configure SLURM settings
-├── spack/            # Spack installation and configuration
-│   └── install.sh    # Install Spack and packages
-├── modules/          # Environment Modules installation and configuration
-│   └── install.sh    # Install Environment Modules
-├── utils/            # Utility scripts
-│   ├── network.sh    # Network configuration utilities
-│   └── system.sh     # System configuration utilities
-└── setup.sh          # Main setup script
+├── apptainer/            # Apptainer setup
+├── common/               # Common functions and utilities
+├── config/               # Configuration files
+├── elk/                  # ELK stack setup
+├── filebeat/             # Filebeat setup
+├── grafana/              # Grafana setup
+├── modules/              # Environment modules setup
+├── monitoring/           # Monitoring setup
+├── slurm/                # SLURM setup
+├── spack/                # Spack setup
+├── squid/                # Squid proxy setup
+├── utils/                # Utility scripts
+├── warewulf/             # Warewulf setup
+└── setup.sh              # Main setup script
 ```
+
+## Configuration Files
+
+Configuration files are located in the `config` directory. Edit these files to customize the installation:
+
+- `network.conf`: Network configuration
+- `warewulf.conf`: Warewulf configuration
+- `slurm.conf`: SLURM configuration
+- `spack.conf`: Spack configuration
+- `monitoring.conf`: Monitoring configuration
+- `squid.conf`: Squid proxy configuration
+- `apptainer.conf`: Apptainer configuration
+
+## Network Configuration
+
+The internal network uses 10.0.0.0/22 with the following settings:
+
+### Head Node
+- IP: 10.0.0.1
+- Provisioning interface: enp2s0
+- DHCP server for initial PXE boot
+- TFTP server for boot files
+- HTTP server for container image
+
+### Compute Nodes
+The compute nodes go through a two-phase IP assignment process:
+
+1. **Initial PXE Boot Phase (10.0.1.x)**
+   - DHCP range: 10.0.1.1 - 10.0.1.255
+   - Temporary IP assignment for PXE boot
+   - Used only during initial boot and provisioning
+   - Managed by DHCP server on head node
+
+2. **Final Provisioned Phase (10.0.2.x)**
+   - Permanent IP range: 10.0.2.1 - 10.0.2.255
+   - Assigned by Warewulf during provisioning
+   - Used for normal operation
+   - Configured in Warewulf container
+
+### Network Flow
+1. Compute node powers on and requests DHCP address
+2. Head node's DHCP server assigns temporary IP (10.0.1.x)
+3. Node downloads PXE boot files via TFTP
+4. Warewulf provisions the node with container image
+5. Warewulf assigns permanent IP (10.0.2.x)
+6. Node reboots with new permanent IP
 
 ## Prerequisites
 

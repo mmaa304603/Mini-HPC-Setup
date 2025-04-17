@@ -1,0 +1,62 @@
+---
+# Squid version
+squid_version: "5.9"
+
+# Squid user and group
+squid_user: "squid"
+squid_group: "squid"
+
+# Squid directories
+squid_config_dir: "/etc/squid"
+squid_cache_dir: "/var/spool/squid"
+squid_log_dir: "/var/log/squid"
+
+# Squid port
+squid_port: 3128
+
+# Cache settings
+squid_cache_mem: "256 MB"
+squid_maximum_object_size: "4096 KB"
+squid_cache_dir: "aufs /var/spool/squid 10000 16 256"
+squid_max_object_size_in_memory: "512 KB"
+
+# Access control
+squid_allowed_networks:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+
+# Authentication settings
+squid_auth_program: "/usr/lib64/squid/basic_ncsa_auth /etc/squid/passwd"
+squid_auth_children: 5
+squid_auth_ttl: 300
+
+# Logging settings
+squid_access_log: "daemon:/var/log/squid/access.log"
+squid_cache_log: "/var/log/squid/cache.log"
+squid_store_log: "none"
+
+# Performance tuning
+squid_max_filedescriptors: 65535
+squid_max_open_disk_fds: 0
+squid_max_open_fds: 65535
+squid_max_filedescriptors: 65535
+squid_max_open_disk_fds: 0
+squid_max_open_fds: 65535
+
+# SSL settings
+squid_ssl_cert: "/etc/squid/ssl_cert"
+squid_ssl_key: "/etc/squid/ssl_key"
+squid_ssl_crtd_program: "/usr/lib64/squid/ssl_crtd -s /var/lib/ssl_db -M 4MB"
+squid_ssl_crtd_children: 5
+
+# Timeouts
+squid_connect_timeout: 1 minute
+squid_read_timeout: 15 minutes
+squid_request_timeout: 5 minutes
+squid_persist_timeout: 1 minute
+squidpinger_timeout: 1 second
+squid_ident_timeout: 10 seconds
+squid_negotiate_timeout: 10 seconds
+squid_dns_timeout: 1 minute
+squid_shutdown_lifetime: 30 seconds 

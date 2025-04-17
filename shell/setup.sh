@@ -82,6 +82,36 @@ run_installations() {
         fi
     fi
     
+    # Squid setup
+    if [ "${SQUID_ENABLED}" = true ]; then
+        if ! verify_checkpoint "squid_setup"; then
+            log_info "Running Squid setup..."
+            if ! "${SCRIPT_DIR}/squid/setup.sh"; then
+                log_error "Squid setup failed"
+                failed=1
+            else
+                create_checkpoint "squid_setup"
+            fi
+        else
+            log_info "Squid setup checkpoint found, skipping..."
+        fi
+    fi
+    
+    # Apptainer setup
+    if [ "${APPTAINER_ENABLED}" = true ]; then
+        if ! verify_checkpoint "apptainer_setup"; then
+            log_info "Running Apptainer setup..."
+            if ! "${SCRIPT_DIR}/apptainer/setup.sh"; then
+                log_error "Apptainer setup failed"
+                failed=1
+            else
+                create_checkpoint "apptainer_setup"
+            fi
+        else
+            log_info "Apptainer setup checkpoint found, skipping..."
+        fi
+    fi
+    
     return $failed
 }
 
@@ -119,30 +149,56 @@ handle_args() {
                         SLURM_ENABLED=false
                         SPACK_ENABLED=false
                         MONITORING_ENABLED=false
+                        SQUID_ENABLED=false
+                        APPTAINER_ENABLED=false
                         ;;
                     slurm)
                         NETWORK_SETUP_ENABLED=false
                         SLURM_ENABLED=true
                         SPACK_ENABLED=false
                         MONITORING_ENABLED=false
+                        SQUID_ENABLED=false
+                        APPTAINER_ENABLED=false
                         ;;
                     spack)
                         NETWORK_SETUP_ENABLED=false
                         SLURM_ENABLED=false
                         SPACK_ENABLED=true
                         MONITORING_ENABLED=false
+                        SQUID_ENABLED=false
+                        APPTAINER_ENABLED=false
                         ;;
                     monitoring)
                         NETWORK_SETUP_ENABLED=false
                         SLURM_ENABLED=false
                         SPACK_ENABLED=false
                         MONITORING_ENABLED=true
+                        SQUID_ENABLED=false
+                        APPTAINER_ENABLED=false
+                        ;;
+                    squid)
+                        NETWORK_SETUP_ENABLED=false
+                        SLURM_ENABLED=false
+                        SPACK_ENABLED=false
+                        MONITORING_ENABLED=false
+                        SQUID_ENABLED=true
+                        APPTAINER_ENABLED=false
+                        ;;
+                    apptainer)
+                        NETWORK_SETUP_ENABLED=false
+                        SLURM_ENABLED=false
+                        SPACK_ENABLED=false
+                        MONITORING_ENABLED=false
+                        SQUID_ENABLED=false
+                        APPTAINER_ENABLED=true
                         ;;
                     all)
                         NETWORK_SETUP_ENABLED=true
                         SLURM_ENABLED=true
                         SPACK_ENABLED=true
                         MONITORING_ENABLED=true
+                        SQUID_ENABLED=true
+                        APPTAINER_ENABLED=true
                         ;;
                     *)
                         log_error "Invalid step: $action"
