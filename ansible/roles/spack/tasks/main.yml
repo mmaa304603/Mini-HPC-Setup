@@ -1,0 +1,105 @@
+---
+- name: Install EPEL repository
+  dnf:
+    name: epel-release
+    state: present
+
+- name: Install Spack dependencies
+  dnf:
+    name:
+      - git
+      - gcc
+      - gcc-c++
+      - make
+      - cmake
+      - python3
+      - python3-pip
+      - environment-modules
+    state: present
+
+- name: Create Spack installation directory
+  file:
+    path: "{{ spack_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Clone Spack repository
+  git:
+    repo: "{{ spack_repo }}"
+    version: "{{ spack_branch }}"
+    dest: "{{ spack_install_dir }}"
+    force: yes
+
+- name: Create Spack environment file
+  template:
+    src: spack.sh.j2
+    dest: /etc/profile.d/spack.sh
+    mode: '0755'
+
+- name: Add compilers to Spack
+  shell: "source /etc/profile.d/spack.sh && spack compiler find {{ item }}"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/compilers.yaml"
+  loop: "{{ spack_compilers }}"
+  changed_when: false
+
+- name: Configure Spack to use system packages
+  shell: "source /etc/profile.d/spack.sh && spack config add 'packages:all:buildable:False'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/packages.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system externals
+  shell: "source /etc/profile.d/spack.sh && spack config add 'packages:all:externals:[]'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/packages.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system compilers
+  shell: "source /etc/profile.d/spack.sh && spack config add 'compilers:all:paths:cc:/usr/bin/gcc'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/compilers.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system C++ compiler
+  shell: "source /etc/profile.d/spack.sh && spack config add 'compilers:all:paths:cxx:/usr/bin/g++'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/compilers.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system Fortran compiler
+  shell: "source /etc/profile.d/spack.sh && spack config add 'compilers:all:paths:f77:/usr/bin/gfortran'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/compilers.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system Fortran compiler (FC)
+  shell: "source /etc/profile.d/spack.sh && spack config add 'compilers:all:paths:fc:/usr/bin/gfortran'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/compilers.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system MPI
+  shell: "source /etc/profile.d/spack.sh && spack config add 'packages:openmpi:externals:[]'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/packages.yaml"
+  changed_when: false
+
+- name: Configure Spack to use system Python
+  shell: "source /etc/profile.d/spack.sh && spack config add 'packages:python:externals:[]'"
+  args:
+    creates: "{{ spack_install_dir }}/etc/spack/packages.yaml"
+  changed_when: false
+
+- name: Install Spack packages
+  shell: "source /etc/profile.d/spack.sh && spack install {{ item }}"
+  args:
+    creates: "{{ spack_install_dir }}/opt/spack/.spack-db/install_records.json"
+  loop: "{{ spack_packages }}"
+  changed_when: false
+
+- name: Generate module files
+  shell: "source /etc/profile.d/spack.sh && spack module tcl refresh -y"
+  args:
+    creates: "{{ modules_default_path }}/spack"
+  changed_when: false 

@@ -1,0 +1,11 @@
+---
+- name: restart slurmd
+  systemd:
+    name: slurmd
+    state: restarted
+
+- name: restart slurmctld
+  systemd:
+    name: slurmctld
+    state: restarted
+  when: inventory_hostname in groups['headnode'] 

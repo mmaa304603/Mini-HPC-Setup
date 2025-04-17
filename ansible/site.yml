@@ -1,0 +1,13 @@
+---
+- name: Configure HPC Head Node
+  hosts: headnode
+  become: true
+  roles:
+    - warewulf
+    - slurm
+
+- name: Configure HPC Compute Nodes
+  hosts: computenodes
+  become: true
+  roles:
+    - slurm 

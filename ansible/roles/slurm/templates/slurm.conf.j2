@@ -1,0 +1,32 @@
+ClusterName=hpc-cluster
+
+# Node definitions
+{% for host in groups['computenodes'] %}
+NodeName={{ host }} State=UNKNOWN
+{% endfor %}
+
+# Partition definitions
+PartitionName=compute Nodes=compute[01-03] Default=YES MaxTime=INFINITE State=UP
+
+# Prolog and Epilog
+Prolog=/etc/slurm/prolog.sh
+Epilog=/etc/slurm/epilog.sh
+
+# Logging
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+
+# Authentication
+AuthAltTypes=auth/munge
+AuthAltParameters=/var/run/munge/munge.socket.2
+
+# Task control
+TaskPlugin=task/affinity
+TaskPlugin=task/cgroup
+
+# Node configuration
+NodeName=compute[01-03] Sockets=1 CoresPerSocket=4 ThreadsPerCore=1 State=UNKNOWN
+
+# Default settings
+DefMemPerNode=4096
+MaxMemPerNode=8192 

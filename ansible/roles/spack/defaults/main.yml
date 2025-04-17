@@ -1,0 +1,25 @@
+---
+# Spack installation directory
+spack_install_dir: /opt/spack
+
+# Spack repository and branch
+spack_repo: https://github.com/spack/spack.git
+spack_branch: develop
+
+# System compilers to add to Spack
+spack_compilers:
+  - /usr/bin/gcc
+  - /usr/bin/g++
+  - /usr/bin/gfortran
+
+# Default packages to install
+spack_packages:
+  - openmpi
+  - python@3.8
+  - hdf5
+  - netcdf
+  - cmake
+  - git
+
+# Environment Modules path
+modules_default_path: /usr/share/Modules/modulefiles 
