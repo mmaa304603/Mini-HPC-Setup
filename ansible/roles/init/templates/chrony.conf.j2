@@ -1,0 +1,21 @@
+# Use public servers from the pool.ntp.org project.
+# Please consider joining the pool (https://www.pool.ntp.org/join.html).
+pool 2.rocky.pool.ntp.org iburst
+
+# Record the rate at which the system clock gains/losses time.
+driftfile /var/lib/chrony/drift
+
+# Allow the client to sync with NTP server
+allow
+
+# Serve time even if not synchronized to a time source.
+local stratum 10
+
+# Specify directory for log files.
+logdir /var/log/chrony
+
+# Use hardware timestamping
+#hwtimestamp *
+
+# Increase the minimum number of selectable sources required to adjust the system clock.
+#minsources 2 

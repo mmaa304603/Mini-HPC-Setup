@@ -1,0 +1,50 @@
+---
+# Finalize system setup
+
+# Verify all required services are running
+- name: Check SLURM services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - slurmd
+    - munged
+  when: "'slurm' in group_names"
+  register: slurm_services
+  ignore_errors: yes
+
+- name: Check Spack environment
+  stat:
+    path: "{{ spack_root }}"
+  when: "'spack' in group_names"
+  register: spack_env
+  ignore_errors: yes
+
+- name: Check monitoring services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - elasticsearch
+    - logstash
+    - kibana
+    - grafana-server
+  when: "'monitoring' in group_names"
+  register: monitoring_services
+  ignore_errors: yes
+
+# Create final checkpoint
+- name: Create final checkpoint
+  include_role:
+    name: checkpoint
+  vars:
+    checkpoint_name: "final_setup"
+  register: final_checkpoint
+
+# Display completion message
+- name: Display completion message
+  debug:
+    msg: "HPC setup completed successfully on {{ inventory_hostname }}"
+  when: final_checkpoint is success 

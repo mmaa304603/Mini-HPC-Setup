@@ -1,0 +1,139 @@
+---
+# Initialize system for HPC setup
+
+# Update system packages
+- name: Update system packages
+  dnf:
+    name: "*"
+    state: latest
+  register: dnf_update
+  changed_when: dnf_update.rc == 0
+  failed_when: dnf_update.rc != 0
+
+# Install EPEL repository
+- name: Install EPEL repository
+  dnf:
+    name: epel-release
+    state: present
+  register: epel_install
+  changed_when: epel_install.rc == 0
+  failed_when: epel_install.rc != 0
+
+# Install development tools
+- name: Install development tools
+  dnf:
+    name: 
+      - gcc
+      - gcc-c++
+      - make
+      - cmake
+      - git
+      - wget
+      - curl
+      - vim
+      - htop
+      - tmux
+      - screen
+      - net-tools
+      - bind-utils
+      - tcpdump
+      - iperf3
+      - nfs-utils
+      - autofs
+      - environment-modules
+    state: present
+  register: dev_tools_install
+  changed_when: dev_tools_install.rc == 0
+  failed_when: dev_tools_install.rc != 0
+
+# Install Python packages
+- name: Install Python packages
+  dnf:
+    name:
+      - python3
+      - python3-pip
+      - python3-devel
+    state: present
+  register: python_install
+  changed_when: python_install.rc == 0
+  failed_when: python_install.rc != 0
+
+# Create log directory
+- name: Create log directory
+  file:
+    path: "{{ log_dir }}"
+    state: directory
+    mode: '0755'
+  register: log_dir_created
+
+# Create checkpoint directory
+- name: Create checkpoint directory
+  file:
+    path: "{{ checkpoint_dir }}"
+    state: directory
+    mode: '0755'
+  register: checkpoint_dir_created
+
+# Set up NTP
+- name: Install NTP
+  dnf:
+    name: chrony
+    state: present
+  register: ntp_install
+  changed_when: ntp_install.rc == 0
+  failed_when: ntp_install.rc != 0
+
+- name: Configure NTP
+  template:
+    src: chrony.conf.j2
+    dest: /etc/chrony.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart chronyd
+  register: ntp_config
+
+- name: Enable and start NTP
+  systemd:
+    name: chronyd
+    state: started
+    enabled: yes
+  register: ntp_service
+
+# Configure SELinux
+- name: Set SELinux to permissive mode
+  command: setenforce 0
+  register: selinux_set
+  changed_when: selinux_set.rc == 0
+  failed_when: selinux_set.rc != 0
+
+- name: Configure SELinux to be permissive on reboot
+  lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: 'SELINUX=permissive'
+  register: selinux_config
+
+# Configure firewall
+- name: Install firewall
+  dnf:
+    name: firewalld
+    state: present
+  register: firewall_install
+  changed_when: firewall_install.rc == 0
+  failed_when: firewall_install.rc != 0
+
+- name: Enable and start firewall
+  systemd:
+    name: firewalld
+    state: started
+    enabled: yes
+  register: firewall_service
+
+# Create checkpoint for initialization
+- name: Create initialization checkpoint
+  include_role:
+    name: checkpoint
+  vars:
+    checkpoint_name: "initial_setup"
+  register: init_checkpoint 

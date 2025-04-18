@@ -1,0 +1,8 @@
+---
+# Handlers for common role
+
+- name: apply sysctl
+  command: sysctl -p
+  register: sysctl_apply
+  changed_when: sysctl_apply.rc == 0
+  failed_when: sysctl_apply.rc != 0 
