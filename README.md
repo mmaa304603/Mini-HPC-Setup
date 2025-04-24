@@ -94,6 +94,8 @@ This repository contains scripts and configurations for setting up a High-Perfor
 ### Spack Configuration
 
 - Installation directory: /opt/spack
+- Configuration directory: /etc/spack
+- System-wide environment: /etc/profile.d/spack.sh
 - Default packages:
   - openmpi
   - mpich
@@ -102,6 +104,65 @@ This repository contains scripts and configurations for setting up a High-Perfor
   - stream
   - cmake
   - gcc
+
+#### System-Level Spack Installation
+
+This project provides two methods for installing Spack at the system level:
+
+1. **Shell Scripts**:
+   - `scripts/install_system_spack.sh`: Installs Spack in `/opt/spack`
+   - `scripts/setup_system_spack_config.sh`: Configures system-wide Spack settings in `/etc/spack`
+
+   Usage:
+   ```bash
+   # Install Spack
+   sudo ./scripts/install_system_spack.sh
+   
+   # Configure Spack
+   sudo ./scripts/setup_system_spack_config.sh
+   ```
+
+2. **Ansible Role**:
+   - The `spack` role in `ansible/roles/spack/` handles system-level installation
+   - Automatically configures compilers, packages, and environment modules
+   - Creates system-wide environment file in `/etc/profile.d/spack.sh`
+
+   Usage:
+   ```bash
+   # Run the playbook with the spack tag
+   ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml --tags spack
+   ```
+
+#### Spack Configuration Files
+
+The following configuration files are created in `/etc/spack/`:
+
+- `config.yaml`: General Spack configuration
+- `compilers.yaml`: System compiler definitions
+- `packages.yaml`: Package preferences and external packages
+- `modules.yaml`: Module file generation settings
+- `spack.yaml`: Environment-specific settings
+
+#### User Access
+
+After installation, users need to either:
+1. Log out and log back in
+2. Run `source /etc/profile.d/spack.sh`
+
+This will make Spack available in their environment.
+
+#### Customizing Spack
+
+To customize the Spack installation:
+
+1. **Shell Scripts**: Edit the variables at the top of the installation scripts
+2. **Ansible**: Modify the variables in `ansible/roles/spack/defaults/main.yml`
+
+Common customizations include:
+- Adding more packages to install
+- Configuring additional compilers
+- Setting up external packages
+- Adjusting build parameters
 
 ### Monitoring Configuration
 

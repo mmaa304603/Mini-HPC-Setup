@@ -1,0 +1,12 @@
+config:
+  install_tree: {{ spack_install_dir }}/opt
+  build_stage:
+    - {{ spack_build_stage }}
+  source_cache: {{ spack_source_cache }}
+  misc_cache: {{ spack_misc_cache }}
+  install_path_scheme: {{ spack_install_path_scheme }}
+  module_roots:
+    tcl: {{ spack_module_roots.tcl }}
+    lmod: {{ spack_module_roots.lmod }}
+  build_language: {{ spack_build_language }}
+  build_jobs: {{ spack_build_jobs }} 

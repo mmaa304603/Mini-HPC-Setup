@@ -1,10 +1,34 @@
 ---
-# Spack installation directory
-spack_install_dir: /opt/spack
+# Default variables for Spack installation and configuration
 
-# Spack repository and branch
-spack_repo: https://github.com/spack/spack.git
-spack_branch: develop
+# Spack version to install
+spack_version: "v0.23.1"
+
+# Spack installation directory
+spack_install_dir: "/opt/spack"
+
+# Spack configuration directory
+spack_config_dir: "/etc/spack"
+
+# Spack repository URL
+spack_repo: "https://github.com/spack/spack.git"
+
+# Build configuration
+spack_build_jobs: 8
+spack_build_language: "C"
+
+# Module configuration
+spack_module_roots:
+  tcl: "{{ spack_install_dir }}/modules/tcl"
+  lmod: "{{ spack_install_dir }}/modules/lmod"
+
+# Cache configuration
+spack_source_cache: "{{ spack_install_dir }}/sources"
+spack_misc_cache: "{{ spack_install_dir }}/cache"
+spack_build_stage: "/tmp/spack-stage"
+
+# Installation path scheme
+spack_install_path_scheme: "{name}/{version}-{compiler.name}-{compiler.version}/{hash}"
 
 # System compilers to add to Spack
 spack_compilers:

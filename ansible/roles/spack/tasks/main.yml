@@ -1,40 +1,87 @@
 ---
-- name: Install EPEL repository
-  dnf:
-    name: epel-release
-    state: present
+# Tasks for system-level Spack installation and configuration
 
-- name: Install Spack dependencies
-  dnf:
-    name:
-      - git
-      - gcc
-      - gcc-c++
-      - make
-      - cmake
-      - python3
-      - python3-pip
-      - environment-modules
+- name: Check Python prerequisites
+  ansible.builtin.command: "python3 -c 'import {{ item }}'"
+  register: python_check
+  failed_when: python_check.rc != 0
+  loop:
+    - clingo
+    - pyyaml
+    - jinja2
+  ignore_errors: yes
+
+- name: Install Python prerequisites
+  ansible.builtin.pip:
+    name: "{{ item }}"
     state: present
+  loop:
+    - clingo
+    - pyyaml
+    - jinja2
+  when: python_check.failed
 
 - name: Create Spack installation directory
-  file:
+  ansible.builtin.file:
     path: "{{ spack_install_dir }}"
     state: directory
     mode: '0755'
+    owner: root
+    group: root
+
+- name: Create Spack configuration directory
+  ansible.builtin.file:
+    path: "{{ spack_config_dir }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
 
 - name: Clone Spack repository
-  git:
+  ansible.builtin.git:
     repo: "{{ spack_repo }}"
-    version: "{{ spack_branch }}"
     dest: "{{ spack_install_dir }}"
+    version: "{{ spack_version }}"
     force: yes
 
-- name: Create Spack environment file
-  template:
+- name: Set Spack installation permissions
+  ansible.builtin.file:
+    path: "{{ spack_install_dir }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+    recurse: yes
+
+- name: Create Spack config.yaml
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ spack_config_dir }}/config.yaml"
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Copy Spack configuration files
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ spack_config_dir }}/{{ item.dest }}"
+    mode: '0644'
+    owner: root
+    group: root
+  loop:
+    - { src: 'spack.yaml', dest: 'spack.yaml' }
+    - { src: 'compilers.yaml', dest: 'compilers.yaml' }
+    - { src: 'packages.yaml', dest: 'packages.yaml' }
+    - { src: 'modules.yaml', dest: 'modules.yaml' }
+  when: item.src is file
+
+- name: Create system-wide Spack environment file
+  ansible.builtin.template:
     src: spack.sh.j2
     dest: /etc/profile.d/spack.sh
-    mode: '0755'
+    mode: '0644'
+    owner: root
+    group: root
 
 - name: Add compilers to Spack
   shell: "source /etc/profile.d/spack.sh && spack compiler find {{ item }}"

@@ -35,3 +35,6 @@ wheels/
 
 # Ansible
 *.retry
+
+# External repositories
+HPCC_EnvConfig/
