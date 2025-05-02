@@ -1,0 +1,15 @@
+1. Create path-restrictions.json file
+2. globus-connect-server storage-gateway create posix "Storage_gateway_1_Sol" --domain ttu.edu --authentication-timeout-mins $((60 * 24 * 30)) --restrict-paths file:path-restrictions.json --user-deny root
+Output: Storage Gateway ID: 24715d6f-461d-4c04-aa8e-4fd23aa14954
+Creates a storage gateway and spits storage gateway ID.
+Source: https://docs.globus.org/globus-connect-server/v5/data-access-guide/#authentication_overview
+
+3. Check ID with this command if forgot ID:
+globus-connect-server storage-gateway list
+Output:
+
+Display Name          | ID                                   | Connector | High Assurance | MFA
+--------------------- | ------------------------------------ | --------- | -------------- | -----
+Storage_gateway_1_Sol | 24715d6f-461d-4c04-aa8e-4fd23aa14954 | POSIX     | False          | False
+
+4. 

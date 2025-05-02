@@ -1,0 +1,49 @@
+Add a given machine as a node to an existing endpoint:
+1. Copy the deployment-key.json file from the previous machine, in this case Sol.
+2. Run: globus-connect-server node setup --client-id "cc7fff7e-4350-4b09-9356-83ebe7ddad5b"
+where the last segment is the client-id generated when one registers a node as a server initially on globus's developer website: https://auth.globus.org/v2/web/developers
+For present project details are in "Globus_Connect_Info.txt".
+
+3. Run: globus-connect-server login localhost
+This returns a link. Use the link and login using HPCC admin details with which the server was initially created on https://auth.globus.org/v2/web/developers
+___________Output________________________________________
+
+[root@luna ~]# globus-connect-server login localhost
+Please authenticate with Globus here:
+------------------------------------
+https://auth.globus.org/v2/oauth2/authorize?client_id=83babbda-155b-4926-a638-08bcfb3e1bd9&redirect_uri=https%3A%2F%2Fauth.globus.org%2Fv2%2Fweb%2Fauth-code&scope=openid+profile+email+urn%3Aglobus%3Aauth%3Ascope%3Aauth.globus.org%3Aview_identity_set+urn%3Aglobus%3Aauth%3Ascope%3Acc7fff7e-4350-4b09-9356-83ebe7ddad5b%3Amanage_collections&state=_default&response_type=code&access_type=offline&prompt=login
+------------------------------------
+Enter the resulting Authorization Code here: KVIhTtNs6RJQS6UhJeHwEzKDnznA10
+You have successfully logged into GCS endpoint cc7fff7e-4350-4b09-9356-83ebe7ddad5b at dff89b.b160.data.globus.org!
+________________________________________________________
+
+The Authorization code screenshot could be seen in the image: Luna_2_adding_node_on_endpoint_1.png
+
+4. globus-connect-server endpoint show
+___________Output________________________________________
+[root@luna ~]# globus-connect-server endpoint show
+Display Name:    TTUHPCC_endpoint_BA.2
+ID:              cc7fff7e-4350-4b09-9356-83ebe7ddad5b
+Subscription ID: None
+Public:          True
+GCS Manager URL: https://dff89b.b160.data.globus.org
+Network Use:     normal
+Organization:    Texas Tech University
+Contact E-mail:  hpcc.globus@ttu.edu
+________________________________________________________
+
+5. Check active nodes on the endpoint by running:
+globus-connect-server node list
+___________Output________________________________________
+
+[root@luna ~]# globus-connect-server node list
+ID                                   | IP Addresses    | Status
+------------------------------------ | --------------- | ------
+66d294af-bbeb-4765-8671-8e9df3a038f2 | 129.118.104.159 | active
+75cdac56-0547-469b-9754-95a76394e141 | 129.118.104.157 | active
+
+________________________________________________________
+
+Source:
+https://docs.globus.org/globus-connect-server/v5.4/#add-dtns
+

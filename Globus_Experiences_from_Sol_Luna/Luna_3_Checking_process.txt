@@ -1,0 +1,21 @@
+Check by logging out of globus server on any of the multiple nodes on an endpoint. Since all nodes have a common storage they point to i.e. /home or /lustre/*
+
+1. globus-connect-server logout
+2. Next step can be done in two ways:
+globus-connect-server node list 
+______________________Output______________________________________
+[root@luna ~]# globus-connect-server node list
+ID                                   | IP Addresses    | Status
+------------------------------------ | --------------- | ------
+End-point-ID | End-point-IP-addr | active
+
+__________________________________________________________________
+
+Use the ID of the relevant node you want to target.
+Then run:
+globus-connect-server node update --disable <ID>
+
+3. Do transfers on the web app and if it works, then fine.
+
+4. Afterwards enable the node again:
+globus-connect-server node update --enable <ID>

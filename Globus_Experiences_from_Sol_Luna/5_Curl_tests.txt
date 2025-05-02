@@ -1,0 +1,235 @@
+1) Curl tests on the 129.118.104.157 host system (2 of them):
+
+A)
+[root@sol ~]# curl -vk --resolve dff89b.b160.data.globus.org:443:127.0.0.1 https://dff89b.b160.data.globus.org/api/info
+* Added dff89b.b160.data.globus.org:443:127.0.0.1 to DNS cache
+* Hostname dff89b.b160.data.globus.org was found in DNS cache
+*   Trying 127.0.0.1...
+* TCP_NODELAY set
+* Connected to dff89b.b160.data.globus.org (127.0.0.1) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+* successfully set certificate verify locations:
+*   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+  CApath: none
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, [no content] (0):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+* ALPN, server accepted to use http/1.1
+* Server certificate:
+*  subject: CN=dff89b.b160.data.globus.org
+*  start date: Apr 29 19:39:52 2022 GMT
+*  expire date: Jul 28 19:39:51 2022 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify ok.
+* TLSv1.3 (OUT), TLS app data, [no content] (0):
+> GET /api/info HTTP/1.1
+> Host: dff89b.b160.data.globus.org
+> User-Agent: curl/7.61.1
+> Accept: */*
+>
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS app data, [no content] (0):
+< HTTP/1.1 200 OK
+< Date: Thu, 19 May 2022 21:09:56 GMT
+< Server: gunicorn
+< Strict-Transport-Security: max-age=31536000; includeSubDomains
+< Content-Type: application/json
+< Content-Length: 445
+< Access-Control-Allow-Origin: *
+< x-gcs-request-id: IIMsfg2YX
+< x-gcs-node-id: 75cdac56-0547-469b-9754-95a76394e141
+<
+{"DATA_TYPE":"result#1.0.0","code":"success","data":[{"DATA_TYPE":"info#1.0.0","api_version":"1.10.0","client_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","domain_name":"dff89b.b160.data.globus.org","endpoint_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","manager_version":"5.4.39"},{"DATA_TYPE":"connector#1.0.0","display_name":"POSIX","id":"145812c8-decc-41f1-83cf-bb2a85a2a70b"}],"detail":"success","has_next_page":false,"http_response_code":200}
+* Connection #0 to host dff89b.b160.data.globus.org left intact
+
+________________________________________________________________________________________________________________________________
+B)
+[root@sol ~]# curl -vk --resolve dff89b.b160.data.globus.org:443:129.118.104.157 https://dff89b.b160.data.globus.org/api/info
+* Added dff89b.b160.data.globus.org:443:129.118.104.157 to DNS cache
+* Hostname dff89b.b160.data.globus.org was found in DNS cache
+*   Trying 129.118.104.157...
+* TCP_NODELAY set
+* Connected to dff89b.b160.data.globus.org (129.118.104.157) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+* successfully set certificate verify locations:
+*   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+  CApath: none
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, [no content] (0):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+* ALPN, server accepted to use http/1.1
+* Server certificate:
+*  subject: CN=dff89b.b160.data.globus.org
+*  start date: Apr 29 19:39:52 2022 GMT
+*  expire date: Jul 28 19:39:51 2022 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify ok.
+* TLSv1.3 (OUT), TLS app data, [no content] (0):
+> GET /api/info HTTP/1.1
+> Host: dff89b.b160.data.globus.org
+> User-Agent: curl/7.61.1
+> Accept: */*
+>
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS app data, [no content] (0):
+< HTTP/1.1 200 OK
+< Date: Thu, 19 May 2022 21:12:43 GMT
+< Server: gunicorn
+< Strict-Transport-Security: max-age=31536000; includeSubDomains
+< Content-Type: application/json
+< Content-Length: 445
+< Access-Control-Allow-Origin: *
+< x-gcs-request-id: DxXjXkqiU
+< x-gcs-node-id: 75cdac56-0547-469b-9754-95a76394e141
+<
+{"DATA_TYPE":"result#1.0.0","code":"success","data":[{"DATA_TYPE":"info#1.0.0","api_version":"1.10.0","client_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","domain_name":"dff89b.b160.data.globus.org","endpoint_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","manager_version":"5.4.39"},{"DATA_TYPE":"connector#1.0.0","display_name":"POSIX","id":"145812c8-decc-41f1-83cf-bb2a85a2a70b"}],"detail":"success","has_next_page":false,"http_response_code":200}
+* Connection #0 to host dff89b.b160.data.globus.org left intact
+
+
+
+
+2) CURL test from another system in the same network segment
+
+[root@luna ~]# curl -vk --resolve dff89b.b160.data.globus.org:443:129.118.104.157 https://dff89b.b160.data.globus.org/api/info
+* Added dff89b.b160.data.globus.org:443:129.118.104.157 to DNS cache
+* Hostname dff89b.b160.data.globus.org was found in DNS cache
+*   Trying 129.118.104.157...
+* TCP_NODELAY set
+* Connected to dff89b.b160.data.globus.org (129.118.104.157) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+* successfully set certificate verify locations:
+*   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+  CApath: none
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.3 (OUT), TLS handshake, [no content] (0):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+* ALPN, server accepted to use http/1.1
+* Server certificate:
+*  subject: CN=dff89b.b160.data.globus.org
+*  start date: Apr 29 19:39:52 2022 GMT
+*  expire date: Jul 28 19:39:51 2022 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify ok.
+* TLSv1.3 (OUT), TLS app data, [no content] (0):
+> GET /api/info HTTP/1.1
+> Host: dff89b.b160.data.globus.org
+> User-Agent: curl/7.61.1
+> Accept: */*
+>
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS handshake, [no content] (0):
+* TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+* TLSv1.3 (IN), TLS app data, [no content] (0):
+< HTTP/1.1 200 OK
+< Date: Thu, 19 May 2022 21:14:19 GMT
+< Server: gunicorn
+< Strict-Transport-Security: max-age=31536000; includeSubDomains
+< Content-Type: application/json
+< Content-Length: 445
+< Access-Control-Allow-Origin: *
+< x-gcs-request-id: EN2iXPEVK
+< x-gcs-node-id: 75cdac56-0547-469b-9754-95a76394e141
+<
+{"DATA_TYPE":"result#1.0.0","code":"success","data":[{"DATA_TYPE":"info#1.0.0","api_version":"1.10.0","client_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","domain_name":"dff89b.b160.data.globus.org","endpoint_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","manager_version":"5.4.39"},{"DATA_TYPE":"connector#1.0.0","display_name":"POSIX","id":"145812c8-decc-41f1-83cf-bb2a85a2a70b"}],"detail":"success","has_next_page":false,"http_response_code":200}
+* Connection #0 to host dff89b.b160.data.globus.org left intact
+
+
+
+
+3) CURL test form third host i.e. my local desktop inside the campus:
+
+  19/05/2022   16:15.04   /home/mobaxterm  curl -vk --resolve dff89b.b160.data.globus.org:443:129.118.104.157 https://dff89b.b160.data.globus.org/api/info
+* Added dff89b.b160.data.globus.org:443:129.118.104.157 to DNS cache
+* Hostname dff89b.b160.data.globus.org was found in DNS cache
+*   Trying 129.118.104.157:443...
+* TCP_NODELAY set
+* Connected to dff89b.b160.data.globus.org (129.118.104.157) port 443 (#0)
+* ALPN, offering http/1.1
+* Cipher selection: ALL:!EXPORT:!EXPORT40:!EXPORT56:!aNULL:!LOW:!RC4:@STRENGTH
+* successfully set certificate verify locations:
+*   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+  CApath: none
+* TLSv1.2 (OUT), TLS header, Certificate Status (22):
+* TLSv1.2 (OUT), TLS handshake, Client hello (1):
+* TLSv1.2 (IN), TLS handshake, Server hello (2):
+* TLSv1.2 (IN), TLS handshake, Certificate (11):
+* TLSv1.2 (IN), TLS handshake, Server key exchange (12):
+* TLSv1.2 (IN), TLS handshake, Server finished (14):
+* TLSv1.2 (OUT), TLS handshake, Client key exchange (16):
+* TLSv1.2 (OUT), TLS change cipher, Change cipher spec (1):
+* TLSv1.2 (OUT), TLS handshake, Finished (20):
+* TLSv1.2 (IN), TLS change cipher, Change cipher spec (1):
+* TLSv1.2 (IN), TLS handshake, Finished (20):
+* SSL connection using TLSv1.2 / ECDHE-RSA-AES128-GCM-SHA256
+* ALPN, server accepted to use http/1.1
+* Server certificate:
+*  subject: CN=dff89b.b160.data.globus.org
+*  start date: Apr 29 19:39:52 2022 GMT
+*  expire date: Jul 28 19:39:51 2022 GMT
+*  issuer: C=US; O=Let's Encrypt; CN=R3
+*  SSL certificate verify result: certificate has expired (10), continuing anyway.
+> GET /api/info HTTP/1.1
+> Host: dff89b.b160.data.globus.org
+> User-Agent: curl/7.65.0
+> Accept: */*
+>
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Date: Thu, 19 May 2022 21:15:16 GMT
+< Server: gunicorn
+< Strict-Transport-Security: max-age=31536000; includeSubDomains
+< Content-Type: application/json
+< Content-Length: 445
+< Access-Control-Allow-Origin: *
+< x-gcs-request-id: uewWDu8Az
+< x-gcs-node-id: 75cdac56-0547-469b-9754-95a76394e141
+<
+{"DATA_TYPE":"result#1.0.0","code":"success","data":[{"DATA_TYPE":"info#1.0.0","api_version":"1.10.0","client_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","domain_name":"dff89b.b160.data.globus.org","endpoint_id":"cc7fff7e-4350-4b09-9356-83ebe7ddad5b","manager_version":"5.4.39"},{"DATA_TYPE":"connector#1.0.0","display_name":"POSIX","id":"145812c8-decc-41f1-83cf-bb2a85a2a70b"}],"detail":"success","has_next_page":false,"http_response_code":200}
+* Connection #0 to host dff89b.b160.data.globus.org left intact
+
+
+
+

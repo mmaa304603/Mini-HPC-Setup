@@ -1,0 +1,7 @@
+[root@sol ~]# globus-connect-server node setup --client-id "cc7fff7e-4350-4b09-9356-83ebe7ddad5b"
+Secret:
+IP address not specified, using 129.118.104.157
+Configuring endpoint
+  [####################################]  100%
+Starting services
+  [####################################]  100%

@@ -1,0 +1,18 @@
+1. globus-connect-server endpoint show --version
+2. globus-connect-server node list
+3. globus-connect-server node update --disable <ID>
+ID                                   | IP Addresses    | Status
+------------------------------------ | --------------- | ------
+End-point-ID | End-point-IP-addr | active
+
+__________________________________________________________________
+
+ Multi node Endpoint Steps
+https://docs.globus.org/globus-connect-server/v5.4/#upgrading_globus_connect_server
+
+4. sudo dnf repository-packages Globus-Connect-Server-5-Stable upgrade
+https://docs.globus.org/globus-connect-server/v5.4/#single-node-upgrade
+
+5. Don't enable updated node until all nodes are updated.
+6. Enable main node by: sudo globus-connect-server node setup 
+7. Enable rest nodes by: globus-connect-server node update --enable <node ID>

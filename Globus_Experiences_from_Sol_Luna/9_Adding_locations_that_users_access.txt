@@ -1,0 +1,8 @@
+
+1. Append the new paths to the path-restrictions.json file:
+"read_write": ["/home","/lustre/work","/lustre/scratch"]
+
+2. To register the changes run the following command:
+globus-connect-server storage-gateway update posix --restrict-paths file:path-restrictions.json 24715d6f-461d-4c04-aa8e-4fd23aa14954
+
+As many parameters have changes need to be used, not just these alone.
