@@ -44,6 +44,7 @@ env/
 *.swp
 *.swo
 *~
+.cursor/
 
 # Ansible
 *.retry
@@ -97,5 +98,5 @@ node_modules/
 *~
 
 # External repositories
-HPCC_EnvConfig/
-Globus_Experiences_from_Sol_Luna/
+HPCC_EnvConfig/**
+Globus_Experiences_from_Sol_Luna/**
