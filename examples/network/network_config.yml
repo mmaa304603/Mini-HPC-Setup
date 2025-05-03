@@ -1,0 +1,66 @@
+# Network Configuration Example
+
+# Network Interface Configuration
+network_interfaces:
+  enp2s0:
+    type: ethernet
+    ip: 10.0.0.1
+    netmask: 255.255.252.0
+    gateway: 10.0.0.1
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+# DHCP Configuration
+dhcp:
+  subnet: 10.0.0.0
+  netmask: 255.255.252.0
+  range:
+    start: 10.0.1.1
+    end: 10.0.1.255
+  options:
+    domain-name: hpc.ttu.edu
+    domain-name-servers: 8.8.8.8, 8.8.4.4
+    default-lease-time: 600
+    max-lease-time: 7200
+
+# TFTP Configuration
+tftp:
+  root: /var/lib/tftpboot
+  enabled: true
+  allow:
+    - 10.0.0.0/22
+
+# NFS Exports
+nfs_exports:
+  - path: /home
+    options: rw,sync,no_subtree_check
+    clients: 10.0.0.0/22
+  - path: /opt
+    options: rw,sync,no_subtree_check
+    clients: 10.0.0.0/22
+  - path: /scratch
+    options: rw,sync,no_subtree_check
+    clients: 10.0.0.0/22
+
+# Firewall Rules
+firewall:
+  enabled: true
+  default_zone: public
+  services:
+    - ssh
+    - dhcp
+    - tftp
+    - nfs
+    - nfs3
+    - mountd
+    - rpc-bind
+  ports:
+    - port: 443
+      protocol: tcp
+    - port: 80
+      protocol: tcp
+    - port: 2811
+      protocol: tcp
+    - port: 50000-51000
+      protocol: tcp 

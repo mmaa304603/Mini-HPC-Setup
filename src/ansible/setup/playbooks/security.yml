@@ -1,0 +1,42 @@
+---
+- name: Configure System Security
+  hosts: all
+  become: true
+  
+  pre_tasks:
+    - name: Load security configuration
+      include_vars:
+        file: ../vars/security.yml
+        
+    - name: Check current security state
+      include_role:
+        name: setup/roles/security
+        tasks_from: check.yml
+
+  roles:
+    - role: setup/roles/security/firewall
+      tags: ['security', 'firewall']
+      
+    - role: setup/roles/security/selinux
+      tags: ['security', 'selinux']
+      
+    - role: setup/roles/security/ssh
+      tags: ['security', 'ssh']
+      
+    - role: setup/roles/security/auth
+      tags: ['security', 'auth']
+      
+    - role: setup/roles/security/audit
+      tags: ['security', 'audit']
+
+  post_tasks:
+    - name: Verify security configuration
+      include_role:
+        name: setup/roles/security
+        tasks_from: verify.yml
+      
+    - name: Generate security report
+      include_role:
+        name: setup/roles/security
+        tasks_from: report.yml
+      when: generate_security_report | default(true) 

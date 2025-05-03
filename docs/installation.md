@@ -17,6 +17,7 @@ Before starting the installation, ensure you have:
    - Static IP for head node (10.0.0.1)
    - DHCP range for compute nodes (10.0.1.1 - 10.0.1.255)
    - Network interface for provisioning (enp2s0)
+   - Open ports for Globus (443, 80, 2811, 50000-51000)
 
 3. **Base OS**
    - Rocky Linux 9.5 installed on head node
@@ -53,6 +54,13 @@ The shell script installation method provides step-by-step control over the inst
    # Check SLURM status
    sinfo
    
+   # Check eRaider authentication
+   sssctl domain-status ttu.edu
+
+   # Check Globus status (based on Sol Luna)
+   globus-connect-server self-diagnostic
+   globus endpoint show HPC\ Cluster
+
    # Check Spack installation
    spack find
    ```
@@ -87,31 +95,50 @@ The Ansible installation method provides automated deployment.
    - Network configuration
    - System updates
    - Basic utilities
+   - Firewall setup
 
 2. **Warewulf**
    - Install Warewulf 4.6
    - Configure provisioning
    - Create container image
+   - Set up node management
 
 3. **SLURM**
    - Install SLURM
    - Configure partitions
    - Set up job accounting
+   - Configure resource limits
 
-4. **Spack and Modules**
+4. **eRaider Authentication**
+   - Configure SSSD
+   - Set up LDAP integration
+   - Configure PAM and NSS
+   - Set up home directory creation
+
+5. **Globus Setup (Based on Sol Luna)**
+   - Install Globus Connect Server
+   - Configure storage gateway
+   - Set up mapped collections
+   - Configure security settings
+   - Set up self-diagnostic tools
+
+6. **Spack and Modules**
    - Install Spack
    - Configure environment modules
    - Install required packages
+   - Set up system-wide environment
 
-5. **Monitoring Stack**
+7. **Monitoring Stack**
    - ELK stack
    - Grafana
    - Filebeat
+   - Configure dashboards
 
-6. **Additional Components**
+8. **Additional Components**
    - Squid proxy
    - Apptainer
    - GitLab CI
+   - Benchmark tools
 
 ## Post-Installation
 
@@ -120,6 +147,8 @@ The Ansible installation method provides automated deployment.
    # Check service status
    systemctl status warewulf
    systemctl status slurmctld
+   systemctl status sssd
+   systemctl status globus-connect-server
    systemctl status elasticsearch
    systemctl status grafana-server
    ```
@@ -130,6 +159,10 @@ The Ansible installation method provides automated deployment.
    firewall-cmd --permanent --add-port=6817/tcp  # SLURM
    firewall-cmd --permanent --add-port=5601/tcp  # Kibana
    firewall-cmd --permanent --add-port=3000/tcp  # Grafana
+   firewall-cmd --permanent --add-port=443/tcp   # Globus HTTPS
+   firewall-cmd --permanent --add-port=80/tcp    # Globus HTTP
+   firewall-cmd --permanent --add-port=2811/tcp  # Globus GridFTP
+   firewall-cmd --permanent --add-port=50000-51000/tcp  # Globus data ports
    firewall-cmd --reload
    ```
 
@@ -142,6 +175,14 @@ The Ansible installation method provides automated deployment.
    - Set up GitLab CI
    - Configure Microsoft Teams webhook
    - Schedule benchmark runs
+
+5. **Configure Globus (Based on Sol Luna)**
+   - Run self-diagnostic tests
+   - Configure storage gateway
+   - Set up mapped collections
+   - Test file transfers
+   - Configure endpoint updates
+   - Set up maintenance procedures
 
 ## Troubleshooting
 
@@ -162,12 +203,28 @@ The Ansible installation method provides automated deployment.
    - Verify partition configuration
    - Check SLURM logs
 
+4. **eRaider Authentication Issues**
+   - Check SSSD status
+   - Verify LDAP connection
+   - Check PAM configuration
+   - Review authentication logs
+
+5. **Globus Issues (Based on Sol Luna)**
+   - Run self-diagnostic tests
+   - Check endpoint status
+   - Verify storage gateway configuration
+   - Check mapped collections
+   - Review service logs
+   - Test file transfers
+
 ### Log Files
 
 - Warewulf logs: `/var/log/warewulf/`
 - SLURM logs: `/var/log/slurm/`
+- SSSD logs: `/var/log/sssd/`
 - ELK logs: `/var/log/elasticsearch/`
 - Grafana logs: `/var/log/grafana/`
+- Globus logs: `/var/log/globus-connect-server/`
 
 ## Next Steps
 
@@ -184,4 +241,11 @@ The Ansible installation method provides automated deployment.
 3. **Performance Tuning**
    - Optimize network settings
    - Tune SLURM parameters
-   - Configure resource limits 
+   - Configure resource limits
+
+4. **Globus Maintenance (Based on Sol Luna)**
+   - Schedule regular self-diagnostics
+   - Plan endpoint updates
+   - Configure service restarts
+   - Monitor collection status
+   - Review security settings 

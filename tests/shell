@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Network testing script
+
+# Check network interface
+echo "Checking network interface..."
+ip addr show enp2s0
+
+# Check routing table
+echo "Checking routing table..."
+ip route show
+
+# Check DNS resolution
+echo "Checking DNS resolution..."
+nslookup ttu.edu
+
+# Check network connectivity
+echo "Checking network connectivity..."
+ping -c 4 8.8.8.8
+
+# Check firewall status
+echo "Checking firewall status..."
+firewall-cmd --list-all
+
+# Check DHCP server
+echo "Checking DHCP server..."
+systemctl status dhcpd
+
+# Check TFTP server
+echo "Checking TFTP server..."
+systemctl status tftpd
+
+# Check NFS server
+echo "Checking NFS server..."
+systemctl status nfs-server
+
+# Check network performance
+echo "Checking network performance..."
+iperf3 -s -D
+iperf3 -c localhost -t 10
+
+# Check network ports
+echo "Checking network ports..."
+netstat -tuln
+
+# Check network logs
+echo "Checking network logs..."
+journalctl -u NetworkManager
+journalctl -u dhcpd
+journalctl -u tftpd
+journalctl -u nfs-server 

@@ -1,0 +1,57 @@
+---
+# Install required packages
+- name: Install eRaider authentication dependencies
+  dnf:
+    name:
+      - sssd
+      - sssd-ldap
+      - sssd-krb5
+      - sssd-krb5-common
+      - krb5-workstation
+      - openldap-clients
+      - nss-pam-ldapd
+      - authconfig
+    state: present
+
+# Configure SSSD
+- name: Create SSSD configuration
+  template:
+    src: sssd.conf.j2
+    dest: /etc/sssd/sssd.conf
+    owner: root
+    group: root
+    mode: '0600'
+  notify: restart sssd
+
+# Configure PAM
+- name: Configure PAM system-auth
+  template:
+    src: system-auth.j2
+    dest: /etc/pam.d/system-auth
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Configure PAM password-auth
+  template:
+    src: password-auth.j2
+    dest: /etc/pam.d/password-auth
+    owner: root
+    group: root
+    mode: '0644'
+
+# Configure NSS
+- name: Configure NSS
+  template:
+    src: nsswitch.conf.j2
+    dest: /etc/nsswitch.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+# Enable and start SSSD service
+- name: Enable and start SSSD service
+  systemd:
+    name: sssd
+    state: started
+    enabled: yes 

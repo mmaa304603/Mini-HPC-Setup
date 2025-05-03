@@ -23,7 +23,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -33,8 +32,69 @@ wheels/
 .installed.cfg
 *.egg
 
+# Virtual Environment
+venv/
+ENV/
+env/
+.env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
 # Ansible
 *.retry
+
+# Logs
+*.log
+logs/
+log/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Build and package files
+*.rpm
+*.deb
+*.tar.gz
+*.zip
+
+# Local configuration
+.env
+.env.local
+*.local.yml
+*.local.yaml
+local_settings.py
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Node modules (if any frontend components)
+node_modules/
+
+# Compiled files
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Backup files
+*.bak
+*.backup
+*~
 
 # External repositories
 HPCC_EnvConfig/

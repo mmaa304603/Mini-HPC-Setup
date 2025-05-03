@@ -1,0 +1,93 @@
+{
+    "networks": {
+        "management": {
+            "subnet": "10.0.0.0/24",
+            "gateway": "10.0.0.1",
+            "dns": ["10.0.0.1", "8.8.8.8"],
+            "ntp": ["10.0.0.1", "pool.ntp.org"],
+            "vlan": 100,
+            "mtu": 1500,
+            "speed": "1Gbps"
+        },
+        "compute": {
+            "subnet": "10.0.1.0/24",
+            "gateway": "10.0.1.1",
+            "vlan": 200,
+            "mtu": 9000,
+            "speed": "10Gbps"
+        },
+        "storage": {
+            "subnet": "10.0.2.0/24",
+            "gateway": "10.0.2.1",
+            "vlan": 300,
+            "mtu": 9000,
+            "speed": "10Gbps"
+        }
+    },
+    "nodes": {
+        "head-node": {
+            "hostname": "head-node",
+            "interfaces": {
+                "eth0": {
+                    "network": "management",
+                    "ip": "10.0.0.1",
+                    "mac": "00:11:22:33:44:55"
+                },
+                "eth1": {
+                    "network": "compute",
+                    "ip": "10.0.1.1",
+                    "mac": "00:11:22:33:44:56"
+                },
+                "eth2": {
+                    "network": "storage",
+                    "ip": "10.0.2.1",
+                    "mac": "00:11:22:33:44:57"
+                }
+            }
+        },
+        "compute-1": {
+            "hostname": "compute-1",
+            "interfaces": {
+                "eth0": {
+                    "network": "compute",
+                    "ip": "10.0.1.2",
+                    "mac": "00:11:22:33:44:58"
+                },
+                "eth1": {
+                    "network": "storage",
+                    "ip": "10.0.2.2",
+                    "mac": "00:11:22:33:44:59"
+                }
+            }
+        },
+        "compute-2": {
+            "hostname": "compute-2",
+            "interfaces": {
+                "eth0": {
+                    "network": "compute",
+                    "ip": "10.0.1.3",
+                    "mac": "00:11:22:33:44:60"
+                },
+                "eth1": {
+                    "network": "storage",
+                    "ip": "10.0.2.3",
+                    "mac": "00:11:22:33:44:61"
+                }
+            }
+        }
+    },
+    "firewall": {
+        "management": {
+            "inbound": ["ssh", "http", "https"],
+            "outbound": ["all"]
+        },
+        "compute": {
+            "inbound": ["ssh", "mpi"],
+            "outbound": ["all"]
+        },
+        "storage": {
+            "inbound": ["nfs", "iscsi"],
+            "outbound": ["all"]
+        }
+    }
+} 

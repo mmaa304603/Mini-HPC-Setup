@@ -1,255 +1,153 @@
-# HPC Cluster Setup
+# Mini HPC Cluster Setup
 
-This repository contains scripts and configurations for setting up a High-Performance Computing (HPC) cluster using Rocky Linux 9.5. The setup includes SLURM workload manager, Spack package manager, monitoring tools, and container support.
+This project provides tools and documentation for setting up a Mini HPC cluster using either Ansible or shell scripts.
 
-## Components
-
-- **Network Setup**: Configuration of network interfaces, DHCP, and firewall rules
-- **SLURM**: Job scheduling and resource management
-- **Spack**: Package management and software installation
-- **Monitoring**: ELK stack (Elasticsearch, Logstash, Kibana) and Grafana
-- **Squid**: HTTP proxy for package caching
-- **Apptainer**: Container runtime for HPC workloads
-
-## Prerequisites
-
-- Rocky Linux 9.5
-- Root access
-- Minimum system requirements:
-  - 20GB disk space
-  - 4GB RAM
-  - 2 CPU cores
-- Network interface (default: enp2s0)
-
-## Directory Structure
+## Project Structure
 
 ```
 .
-├── ansible/              # Ansible playbooks and roles
-│   ├── inventory/       # Inventory files
-│   ├── roles/          # Ansible roles
-│   └── vars/           # Variable definitions
-├── shell/              # Shell scripts
-│   ├── common/         # Common functions and configs
-│   ├── network/        # Network setup scripts
-│   ├── slurm/          # SLURM setup scripts
-│   ├── spack/          # Spack setup scripts
-│   ├── monitoring/     # Monitoring setup scripts
-│   ├── squid/          # Squid setup scripts
-│   ├── apptainer/      # Apptainer setup scripts
-│   └── utils/          # Utility scripts
-└── docs/               # Documentation
+├── src/              # Source code (implementation)
+│   ├── ansible/      # Ansible implementation
+│   ├── shell/        # Shell implementation
+│   └── common/       # Common utilities
+│
+├── docs/             # Project documentation
+│   ├── architecture/ # System architecture
+│   ├── development/  # Development guides
+│   ├── deployment/   # Deployment guides
+│   └── api/          # API documentation
+│
+├── examples/         # Reference examples
+│   ├── ansible/      # Ansible examples
+│   ├── shell/        # Shell examples
+│   └── config/       # Configuration examples
+│
+├── tests/            # Test framework
+│   ├── unit/         # Unit tests
+│   ├── integration/  # Integration tests
+│   ├── performance/  # Performance tests
+│   └── data/         # Test data
+│
+├── tools/            # Development tools (project management)
+│   ├── lint/         # Linting tools
+│   ├── format/       # Code formatters
+│   └── test/         # Test runners
+│
+├── config/           # Deployment configurations
+│   ├── dev/          # Development config
+│   ├── test/         # Test config
+│   └── prod/         # Production config
+│
+├── .gitlab-ci.yml    # CI/CD configuration
+├── CONTRIBUTING.md   # Contribution guidelines
+└── LICENSE           # Project license
 ```
 
-## Installation
+## Directory Organization
 
-### Using Shell Scripts
+### Source Code (`src/`)
+- Contains the actual implementation code
+- Split into Ansible and shell methods
+- Includes common utilities
+- Focused on HPC cluster functionality
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/hpc-setup.git
-   cd hpc-setup
-   ```
+### Project Resources
+- **Documentation** (`docs/`): Project documentation and guides
+- **Examples** (`examples/`): Reference implementations
+- **Tests** (`tests/`): Test framework and data
 
-2. Run the setup script:
-   ```bash
-   sudo ./shell/setup.sh
-   ```
+### Project Management
+- **Tools** (`tools/`): Development utilities
+  - Used for maintaining the project
+  - Not part of the HPC setup
+  - Includes linting, formatting, and testing tools
 
-   Available options:
-   - `--step <component>`: Install specific component (network, slurm, spack, monitoring, squid, apptainer)
-   - `--list-checkpoints`: List available checkpoints
-   - `--clear-checkpoint <name>`: Clear specific checkpoint
-   - `--clear-all-checkpoints`: Clear all checkpoints
+- **Configuration** (`config/`): Deployment settings
+  - Environment-specific configurations
+  - Controls how the code runs
+  - Not part of the source code
 
-### Using Ansible
+## Configuration Methods
 
-1. Install Ansible:
-   ```bash
-   sudo dnf install ansible
-   ```
+### Ansible Method
+- Uses Ansible for configuration management
+- Located in `src/ansible/`
+- Features:
+  - Declarative configuration
+  - Idempotent operations
+  - Role-based organization
+  - Inventory management
+- Documentation: `docs/deployment/ansible/`
+- Examples: `examples/ansible/`
 
-2. Run the playbook:
-   ```bash
-   ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml
-   ```
+### Shell Method
+- Uses shell scripts for configuration
+- Located in `src/shell/`
+- Features:
+  - Imperative configuration
+  - Direct system control
+  - Script-based automation
+  - Template-based configuration
+- Documentation: `docs/deployment/shell/`
+- Examples: `examples/shell/`
 
-## Configuration
+## Documentation
 
-### Network Configuration
+- Architecture: `docs/architecture/`
+- Development: `docs/development/`
+- Deployment: `docs/deployment/`
+- API: `docs/api/`
 
-- Interface: enp2s0
-- Head node IP: 10.0.0.1
-- Network mask: 255.255.252.0
-- DHCP range: 10.0.1.1 - 10.0.1.255
+## Examples
 
-### SLURM Configuration
+- Ansible: `examples/ansible/`
+- Shell: `examples/shell/`
+- Configuration: `examples/config/`
 
-- Cluster name: hpc-cluster
-- Default partition: normal
-- Accounting enabled
-- Max jobs: 10000
-- Max jobs per user: 1000
+## Testing
 
-### Spack Configuration
+- Unit Tests: `tests/unit/`
+- Integration Tests: `tests/integration/`
+- Performance Tests: `tests/performance/`
+- Test Data: `tests/data/`
 
-- Installation directory: /opt/spack
-- Configuration directory: /etc/spack
-- System-wide environment: /etc/profile.d/spack.sh
-- Default packages:
-  - openmpi
-  - mpich
-  - hpl
-  - osu-micro-benchmarks
-  - stream
-  - cmake
-  - gcc
+## Development
 
-#### System-Level Spack Installation
+### Prerequisites
+- Ansible 2.9+
+- Bash 4.4+
+- Python 3.8+
+- Git
 
-This project provides two methods for installing Spack at the system level:
+### Setup
+```bash
+# Clone repository
+git clone https://github.com/ttu-hpc/Mini-HPC-Setup.git
+cd Mini-HPC-Setup
 
-1. **Shell Scripts**:
-   - `scripts/install_system_spack.sh`: Installs Spack in `/opt/spack`
-   - `scripts/setup_system_spack_config.sh`: Configures system-wide Spack settings in `/etc/spack`
+# Install development tools
+./tools/setup-dev-env.sh
 
-   Usage:
-   ```bash
-   # Install Spack
-   sudo ./scripts/install_system_spack.sh
-   
-   # Configure Spack
-   sudo ./scripts/setup_system_spack_config.sh
-   ```
+# Run tests
+./tests/run-tests.sh
+```
 
-2. **Ansible Role**:
-   - The `spack` role in `ansible/roles/spack/` handles system-level installation
-   - Automatically configures compilers, packages, and environment modules
-   - Creates system-wide environment file in `/etc/profile.d/spack.sh`
-
-   Usage:
-   ```bash
-   # Run the playbook with the spack tag
-   ansible-playbook -i ansible/inventory/hosts.yml ansible/site.yml --tags spack
-   ```
-
-#### Spack Configuration Files
-
-The following configuration files are created in `/etc/spack/`:
-
-- `config.yaml`: General Spack configuration
-- `compilers.yaml`: System compiler definitions
-- `packages.yaml`: Package preferences and external packages
-- `modules.yaml`: Module file generation settings
-- `spack.yaml`: Environment-specific settings
-
-#### User Access
-
-After installation, users need to either:
-1. Log out and log back in
-2. Run `source /etc/profile.d/spack.sh`
-
-This will make Spack available in their environment.
-
-#### Customizing Spack
-
-To customize the Spack installation:
-
-1. **Shell Scripts**: Edit the variables at the top of the installation scripts
-2. **Ansible**: Modify the variables in `ansible/roles/spack/defaults/main.yml`
-
-Common customizations include:
-- Adding more packages to install
-- Configuring additional compilers
-- Setting up external packages
-- Adjusting build parameters
-
-### Monitoring Configuration
-
-- Elasticsearch: Port 9200
-- Kibana: Port 5601
-- Grafana: Port 3000
-- Logstash: Port 5044 (beats)
-
-### Squid Configuration
-
-- Port: 3128
-- Cache size: 10000 MB
-- Max object size: 4096 KB
-
-### Apptainer Configuration
-
-- Installation directory: /opt/apptainer
-- Cache directory: /opt/apptainer/cache
-- Bind paths:
-  - /scratch
-  - /opt/software
-  - /opt/modules
-
-## Usage
-
-### SLURM
-
-1. Submit a job:
-   ```bash
-   srun --partition=normal --time=01:00:00 ./your_program
-   ```
-
-2. Check job status:
-   ```bash
-   squeue
-   ```
-
-### Spack
-
-1. Install a package:
-   ```bash
-   spack install package_name
-   ```
-
-2. Load a package:
-   ```bash
-   spack load package_name
-   ```
-
-### Monitoring
-
-1. Access Kibana:
-   ```
-   http://headnode:5601
-   ```
-
-2. Access Grafana:
-   ```
-   http://headnode:3000
-   ```
-
-## Troubleshooting
-
-1. Check logs:
-   ```bash
-   tail -f /var/log/slurm/slurm_jobacct.log
-   ```
-
-2. Verify services:
-   ```bash
-   systemctl status slurmctld
-   systemctl status slurmd
-   ```
-
-3. Check network:
-   ```bash
-   ip addr show enp2s0
-   ```
+### Configuration
+- Development: `config/dev/`
+- Testing: `config/test/`
+- Production: `config/prod/`
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
+
+## Support
+
+For issues and questions:
+- Email: hpc-dev@ttu.edu
+- Documentation: `docs/`
+- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues)

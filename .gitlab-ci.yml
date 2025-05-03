@@ -1,9 +1,75 @@
 stages:
-  - benchmark
+  - test
+  - build
+  - deploy
+  - monitor
 
 variables:
   SLURM_CLUSTER: hpc-cluster
   TEAMS_WEBHOOK_URL: ${TEAMS_WEBHOOK_URL}
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+
+before_script:
+  - docker info
+  - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+test:
+  stage: test
+  image: docker:stable
+  services:
+    - docker:dind
+  script:
+    - docker build -t hpc-test .
+    - docker run hpc-test ./tests/unit/shell/run_tests.sh
+    - docker run hpc-test ./tests/unit/ansible/run_tests.sh
+    - docker run hpc-test ./tests/integration/network/run_tests.sh
+    - docker run hpc-test ./tests/integration/services/run_tests.sh
+    - docker run hpc-test ./tests/performance/benchmarks/run_benchmarks.sh
+    - docker run hpc-test ./tests/regression/daily/run_tests.sh
+    - docker run hpc-test ./tests/smoke/run_tests.sh
+  artifacts:
+    paths:
+      - test-results/
+    reports:
+      junit: test-results/junit.xml
+  only:
+    - master
+    - merge_requests
+
+build:
+  stage: build
+  image: docker:stable
+  services:
+    - docker:dind
+  script:
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  only:
+    - master
+
+deploy:
+  stage: deploy
+  image: docker:stable
+  services:
+    - docker:dind
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
+    - docker push $CI_REGISTRY_IMAGE:latest
+  only:
+    - master
+
+monitor:
+  stage: monitor
+  image: docker:stable
+  services:
+    - docker:dind
+  script:
+    - docker run $CI_REGISTRY_IMAGE:latest ./tests/performance/monitoring/run_monitoring.sh
+  only:
+    - master
+  when: on_success
 
 benchmark:
   stage: benchmark

@@ -1,0 +1,32 @@
+WW_INTERNAL: 43
+ipaddr: {{ network_ip }}
+netmask: {{ network_mask }}
+network: {{ network }}
+warewulf:
+  port: 9873
+  secure: false
+  update interval: 60
+  autobuild: true
+  host overlay: true
+  syslog: true
+dhcp:
+  enabled: true
+  range start: {{ dhcp_start }}
+  range end: {{ dhcp_end }}
+  systemd name: dhcpd
+tftp:
+  enabled: true
+  tftpdir: /var/lib/tftpboot
+  systemd name: tftp
+nfs:
+  enabled: true
+  export paths:
+    - path: /home
+      export options: rw,sync,no_subtree_check
+    - path: /opt
+      export options: rw,sync,no_subtree_check
+    - path: /scratch
+      export options: rw,sync,no_subtree_check
+  systemd name: nfs-server
+container_base = /var/lib/warewulf/container
+container_name = rocky-8 

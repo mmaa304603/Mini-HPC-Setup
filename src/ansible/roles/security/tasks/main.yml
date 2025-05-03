@@ -1,0 +1,103 @@
+---
+# Security role tasks
+
+- name: Install security tools
+  dnf:
+    name:
+      - lynis
+      - rkhunter
+      - clamav
+    state: present
+
+- name: Configure firewall
+  firewalld:
+    service: "{{ item }}"
+    permanent: yes
+    state: enabled
+  with_items:
+    - ssh
+    - dhcp
+    - tftp
+    - nfs
+    - http
+    - https
+
+- name: Configure SSH
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    mode: '0600'
+  notify: restart sshd
+
+- name: Configure SELinux
+  selinux:
+    state: enforcing
+    policy: targeted
+
+- name: Configure audit rules
+  template:
+    src: audit.rules.j2
+    dest: /etc/audit/rules.d/audit.rules
+    mode: '0600'
+  notify: restart auditd
+
+- name: Configure PAM
+  template:
+    src: system-auth.j2
+    dest: /etc/pam.d/system-auth
+    mode: '0644'
+
+- name: Configure SSSD
+  template:
+    src: sssd.conf.j2
+    dest: /etc/sssd/sssd.conf
+    mode: '0600'
+  notify: restart sssd
+
+- name: Configure SSL/TLS
+  template:
+    src: ssl.conf.j2
+    dest: /etc/ssl/globus.conf
+    mode: '0600'
+
+- name: Set file permissions
+  file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+  with_items:
+    - { path: /home/*, mode: '0700', owner: 'user', group: 'user' }
+    - { path: /shared, mode: '0755', owner: 'root', group: 'users' }
+    - { path: /etc/ssh, mode: '0700', owner: 'root', group: 'root' }
+    - { path: /etc/ssl, mode: '0700', owner: 'root', group: 'root' }
+
+- name: Run security scan
+  shell: |
+    lynis audit system
+    rkhunter --check
+    freshclam
+    clamscan -r / --exclude-dir="^/sys" --exclude-dir="^/proc" --exclude-dir="^/dev"
+  register: security_scan_results
+
+- name: Save security report
+  copy:
+    content: |
+      Security Scan Report - {{ ansible_date_time.date }}
+      =============================
+      
+      {{ security_scan_results.stdout_lines | to_nice_json }}
+    dest: /var/log/security/{{ ansible_date_time.date }}.log
+    mode: '0600'
+
+- name: Configure backup encryption
+  template:
+    src: encryption.conf.j2
+    dest: /etc/backup/encryption.conf
+    mode: '0600'
+
+- name: Generate security report
+  template:
+    src: security_report.j2
+    dest: /var/log/security/report-{{ ansible_date_time.date }}.log
+    mode: '0600' 

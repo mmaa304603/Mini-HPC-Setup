@@ -1,0 +1,122 @@
+---
+# Maintenance role tasks
+
+- name: Create maintenance directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - /var/log/maintenance
+    - /var/log/updates
+    - /var/log/cleanup
+
+- name: Check system status
+  shell: |
+    uptime
+    free -h
+    df -h
+    systemctl status
+  register: system_status
+  changed_when: false
+
+- name: Check service status
+  shell: |
+    systemctl status warewulfd
+    systemctl status slurmctld
+    systemctl status globus-connect-server
+    systemctl status elasticsearch
+    systemctl status grafana-server
+  register: service_status
+  changed_when: false
+
+- name: Check network status
+  shell: |
+    ip addr
+    netstat -tuln
+    ping -c 4 8.8.8.8
+  register: network_status
+  changed_when: false
+
+- name: Check storage status
+  shell: |
+    df -h
+    du -sh /home /shared /scratch
+    ls -la /home /shared /scratch
+  register: storage_status
+  changed_when: false
+
+- name: Check user accounts
+  shell: |
+    getent passwd
+    getent group
+    last
+  register: user_status
+  changed_when: false
+
+- name: Check logs
+  shell: |
+    journalctl --since "24 hours ago"
+    tail -n 100 /var/log/messages
+    tail -n 100 /var/log/secure
+  register: log_status
+  changed_when: false
+
+- name: Check updates
+  shell: |
+    dnf check-update
+    dnf list installed
+  register: update_status
+  changed_when: false
+
+- name: Check backups
+  shell: |
+    ls -la /backup
+    du -sh /backup
+  register: backup_status
+  changed_when: false
+
+- name: Check monitoring
+  shell: |
+    systemctl status node_exporter
+    systemctl status prometheus
+    systemctl status grafana-server
+  register: monitoring_status
+  changed_when: false
+
+- name: Generate maintenance report
+  template:
+    src: maintenance_report.j2
+    dest: /var/log/maintenance/report-{{ ansible_date_time.date }}.log
+    mode: '0600'
+
+- name: Clean up old logs
+  shell: |
+    find /var/log -type f -mtime +30 -delete
+    journalctl --vacuum-time=30d
+  register: cleanup_status
+  changed_when: false
+
+- name: Update system
+  dnf:
+    name: "*"
+    state: latest
+    update_cache: yes
+  register: update_results
+
+- name: Reboot if needed
+  reboot:
+    msg: "System update requires reboot"
+    connect_timeout: 5
+    reboot_timeout: 600
+    pre_reboot_delay: 0
+    post_reboot_delay: 30
+  when: update_results.changed
+
+- name: Schedule next maintenance
+  cron:
+    name: "Daily maintenance"
+    hour: "2"
+    minute: "0"
+    job: "/usr/local/bin/maintenance_daily.sh"
+    state: present 

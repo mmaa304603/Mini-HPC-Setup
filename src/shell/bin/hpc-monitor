@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# HPC Cluster Monitoring Script
+# Version: 1.0.0
+
+# Configuration
+CONFIG_DIR="/etc/hpc"
+LOG_DIR="/var/log/hpc"
+ALERT_THRESHOLD=90
+CHECK_INTERVAL=60
+
+# Logging setup
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_DIR/hpc-monitor.log"
+}
+
+# Alert function
+alert() {
+    log "ALERT: $1"
+    # Implementation for sending alerts
+}
+
+# Resource checks
+check_cpu() {
+    local usage=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}')
+    if [ $(echo "$usage > $ALERT_THRESHOLD" | bc) -eq 1 ]; then
+        alert "High CPU usage: $usage%"
+    fi
+}
+
+check_memory() {
+    local usage=$(free | grep Mem | awk '{print $3/$2 * 100.0}')
+    if [ $(echo "$usage > $ALERT_THRESHOLD" | bc) -eq 1 ]; then
+        alert "High memory usage: $usage%"
+    fi
+}
+
+check_disk() {
+    local usage=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+    if [ $usage -gt $ALERT_THRESHOLD ]; then
+        alert "High disk usage: $usage%"
+    fi
+}
+
+check_network() {
+    # Implementation for network checks
+    log "Checking network status"
+}
+
+check_services() {
+    # Implementation for service checks
+    log "Checking service status"
+}
+
+# Main monitoring loop
+monitor() {
+    while true; do
+        log "Starting monitoring cycle"
+        
+        check_cpu
+        check_memory
+        check_disk
+        check_network
+        check_services
+        
+        log "Monitoring cycle completed"
+        sleep $CHECK_INTERVAL
+    done
+}
+
+# Command handlers
+handle_status() {
+    case "$1" in
+        cpu)
+            check_cpu
+            ;;
+        memory)
+            check_memory
+            ;;
+        disk)
+            check_disk
+            ;;
+        network)
+            check_network
+            ;;
+        services)
+            check_services
+            ;;
+        all)
+            check_cpu
+            check_memory
+            check_disk
+            check_network
+            check_services
+            ;;
+        *)
+            echo "Usage: hpc-monitor status [cpu|memory|disk|network|services|all]"
+            ;;
+    esac
+}
+
+# Main script
+main() {
+    case "$1" in
+        start)
+            monitor &
+            ;;
+        stop)
+            pkill -f "hpc-monitor start"
+            ;;
+        status)
+            handle_status "$2"
+            ;;
+        help)
+            echo "Usage: hpc-monitor [command] [options]"
+            echo "Commands:"
+            echo "  start   - Start monitoring"
+            echo "  stop    - Stop monitoring"
+            echo "  status  - Check status of specific component"
+            echo "  help    - Show this help message"
+            ;;
+        *)
+            echo "Invalid command: $1"
+            ;;
+    esac
+}
+
+# Execute main function
+main "$@" 

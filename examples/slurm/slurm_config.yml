@@ -1,0 +1,100 @@
+# SLURM Configuration Example
+
+# SLURM Control Machine
+control_machine: hpc-master
+control_addr: 10.0.0.1
+slurm_user: slurm
+slurmctld_port: 6817
+slurmd_port: 6818
+
+# Authentication
+auth_type: auth/munge
+crypto_type: crypto/munge
+
+# Logging
+slurmctld_log_file: /var/log/slurm/slurmctld.log
+slurmd_log_file: /var/log/slurm/slurmd.log
+slurmdbd_log_file: /var/log/slurm/slurmdbd.log
+
+# Accounting
+accounting_storage_type: accounting_storage/slurmdbd
+accounting_storage_host: hpc-master
+accounting_storage_port: 6819
+accounting_storage_user: slurm
+accounting_storage_pass: "{{ vault_slurm_db_password }}"
+
+# Scheduler
+scheduler_type: sched/backfill
+select_type: select/linear
+priority_type: priority/multifactor
+priority_decay_hl: 14-0
+priority_favor_small: NO
+priority_max_age: 7-0
+priority_weight_age: 1000
+priority_weight_fairshare: 1000
+priority_weight_job_size: 1000
+priority_weight_partition: 1000
+priority_weight_qos: 0
+
+# Nodes
+nodes:
+  - name: hpc-node[1-4]
+    cpus: 4
+    real_memory: 16000
+    sockets: 1
+    cores_per_socket: 4
+    threads_per_core: 1
+    state: UNKNOWN
+    features: x86_64,avx2
+
+# Partitions
+partitions:
+  - name: debug
+    nodes: hpc-node[1-4]
+    default: YES
+    max_time: 1:00:00
+    state: UP
+    priority: 1
+    preempt_mode: OFF
+    max_nodes: 4
+    max_cpus_per_node: 4
+    max_mem_per_node: 16000
+    default_mem_per_node: 4000
+    max_nodes_per_user: 2
+    max_cpus_per_user: 8
+    max_mem_per_user: 32000
+
+  - name: compute
+    nodes: hpc-node[1-4]
+    default: NO
+    max_time: 7-00:00:00
+    state: UP
+    priority: 2
+    preempt_mode: OFF
+    max_nodes: 4
+    max_cpus_per_node: 4
+    max_mem_per_node: 16000
+    default_mem_per_node: 4000
+    max_nodes_per_user: 4
+    max_cpus_per_user: 16
+    max_mem_per_user: 64000
+
+# QoS
+qos:
+  - name: normal
+    priority: 0
+    max_jobs: 100
+    max_submit_jobs: 100
+    max_wall: 7-00:00:00
+    max_nodes: 4
+    max_cpus: 16
+    max_mem: 64000
+
+  - name: high
+    priority: 10
+    max_jobs: 50
+    max_submit_jobs: 50
+    max_wall: 3-00:00:00
+    max_nodes: 2
+    max_cpus: 8
+    max_mem: 32000 

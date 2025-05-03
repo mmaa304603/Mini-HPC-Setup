@@ -1,0 +1,35 @@
+---
+- name: Initial System Setup
+  hosts: all
+  become: true
+  
+  pre_tasks:
+    - name: Load system variables
+      include_vars:
+        file: ../vars/system.yml
+        
+    - name: Check system requirements
+      include_role:
+        name: core/roles/common
+        tasks_from: check_requirements.yml
+
+  roles:
+    - role: setup/roles/packages
+      tags: ['packages', 'init']
+      
+    - role: setup/roles/users
+      tags: ['users', 'init']
+      
+    - role: setup/roles/security
+      tags: ['security', 'init']
+      
+    - role: setup/roles/network
+      tags: ['network', 'init']
+
+  post_tasks:
+    - name: Create setup completion flag
+      file:
+        path: "{{ setup_complete_flag }}"
+        state: touch
+        mode: '0644'
+      when: not ansible_check_mode 

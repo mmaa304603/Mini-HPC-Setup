@@ -1,0 +1,56 @@
+---
+# Backup Configuration Variables
+
+# Backup Locations
+backup_root: /data/backup
+backup_user: backup
+backup_group: "{{ admin_group }}"
+
+# Retention Settings
+retention:
+  daily: 7    # days
+  weekly: 4   # weeks
+  monthly: 6  # months
+
+# Backup Sources
+backup_sources:
+  - name: home_directories
+    path: /home
+    type: daily
+    exclude:
+      - "*.tmp"
+      - "*.temp"
+      - "*/Downloads"
+  
+  - name: system_config
+    path: /etc
+    type: weekly
+    exclude: []
+    
+  - name: slurm_config
+    path: /etc/slurm
+    type: daily
+    exclude: []
+    
+  - name: spack_config
+    path: /etc/spack
+    type: weekly
+    exclude: []
+
+# Compression Settings
+compression:
+  method: gzip
+  level: 6
+
+# Monitoring Settings
+monitoring:
+  enabled: true
+  alert_on_failure: true
+  alert_on_space: true
+  min_free_space_gb: 50
+
+# Logging Settings
+log_file: /var/log/hpc-setup/backup.log
+log_level: INFO
+log_rotate: weekly
+log_keep: 12 

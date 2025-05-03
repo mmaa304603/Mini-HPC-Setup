@@ -1,0 +1,81 @@
+---
+# Security Configuration Variables
+
+# Firewall Configuration
+firewall:
+  service: firewalld
+  state: enabled
+  default_zone: public
+  allowed_services:
+    - ssh
+    - http
+    - https
+    - ntp
+  custom_rules:
+    - port: 6817-6819
+      protocol: tcp
+      service: slurm
+    - port: 8649
+      protocol: tcp
+      service: ganglia
+
+# SELinux Configuration
+selinux:
+  state: enforcing
+  policy: targeted
+  booleans:
+    - name: httpd_can_network_connect
+      state: on
+    - name: use_nfs_home_dirs
+      state: on
+
+# SSH Configuration
+ssh:
+  port: 22
+  protocol: 2
+  permit_root_login: "no"
+  password_authentication: "no"
+  x11_forwarding: "no"
+  max_auth_tries: 3
+  allowed_groups:
+    - hpc-admin
+  allowed_users: []
+  deny_users:
+    - root
+  deny_groups: []
+
+# Authentication Configuration
+auth:
+  password_min_length: 12
+  password_max_age: 90
+  password_min_age: 7
+  password_warn_age: 14
+  failed_login_attempts: 5
+  unlock_time: 900
+  remember_count: 5
+  hash_algorithm: sha512
+
+# Audit Configuration
+audit:
+  enabled: true
+  log_file: /var/log/audit/audit.log
+  space_left: 100
+  space_left_action: email
+  admin_space_left: 50
+  admin_space_left_action: halt
+  disk_full_action: halt
+  disk_error_action: halt
+  rules:
+    - "-a always,exit -F arch=b64 -S execve -k commands"
+    - "-w /etc/passwd -p wa -k identity"
+    - "-w /etc/group -p wa -k identity"
+    - "-w /etc/shadow -p wa -k identity"
+    - "-w /etc/sudoers -p wa -k identity"
+
+# Security Report Configuration
+security_report:
+  enabled: true
+  report_file: /var/log/hpc-setup/security_report.txt
+  email_report: true
+  email_recipients:
+    - hpc-admin@ttu.edu 

@@ -1,13 +1,39 @@
-# Set default to LF
-* text=auto eol=lf
+# Set default behavior to automatically normalize line endings
+* text=auto
 
-# Ensure shell scripts always use LF
+# Shell scripts should always use LF
 *.sh text eol=lf
+*.bash text eol=lf
 
-# Windows batch files use CRLF
-*.bat text eol=crlf
+# Ansible files should use LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.j2 text eol=lf
 
-# Binary files should not be altered
+# Python files should use LF
+*.py text eol=lf
+*.pyw text eol=lf
+
+# Documentation files
+*.md text eol=lf
+*.txt text eol=lf
+*.rst text eol=lf
+
+# Config files should use LF
+*.conf text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
+
+# Git config files
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Binary files should be left untouched
 *.png binary
 *.jpg binary
+*.gif binary
+*.ico binary
+*.gz binary
+*.zip binary
+*.tar binary
 *.pdf binary
