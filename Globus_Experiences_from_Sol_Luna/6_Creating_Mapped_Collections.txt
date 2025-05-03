@@ -1,3 +1,0 @@
-1. [root@sol ~]# globus-connect-server collection create 24715d6f-461d-4c04-aa8e-4fd23aa14954 / "TTUSol" --organization 'Texas Tech University' --contact-email hpcc.globus@ttu.edu --info-link https://www.depts.ttu.edu/hpcc/ --keywords ttu.edu,home,lustre --sharing-restrict-paths file:sharing_restrictions.json
-Collection ID: 04028737-0378-407e-bf92-f18602a4ab59
-Source: https://docs.globus.org/globus-connect-server/v5.4/data-access-guide/

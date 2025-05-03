@@ -1,8 +1,0 @@
-Install GCS v5 
-1. dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-2. dnf install https://downloads.globus.org/globus-connect-server/stable/installers/repo/rpm/globus-repo-latest.noarch.rpm
-3. dnf install globus-connect-server54
-
-Source:
-https://docs.globus.org/globus-connect-server/v5.4/#gcsv5-install
-
