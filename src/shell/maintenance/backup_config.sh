@@ -45,9 +45,9 @@ tar -czf $BACKUP_DIR/elasticsearch.tar.gz /etc/elasticsearch
 tar -czf $BACKUP_DIR/kibana.tar.gz /etc/kibana
 tar -czf $BACKUP_DIR/grafana.tar.gz /etc/grafana
 
-# Backup Squid configuration
-echo "Backing up Squid configuration..."
-tar -czf $BACKUP_DIR/squid.tar.gz /etc/squid
+# Backup Squid configuration - removed, no longer needed with spack
+# echo "Backing up Squid configuration..."
+# tar -czf $BACKUP_DIR/squid.tar.gz /etc/squid
 
 # Backup Apptainer configuration
 echo "Backing up Apptainer configuration..."

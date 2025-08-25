@@ -35,7 +35,7 @@ all:
       children:
         headnode:
         computenodes:
-    squid:
+    # squid:  # Removed - squid no longer needed with spack
       children:
         headnode:
     apptainer:

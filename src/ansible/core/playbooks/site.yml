@@ -25,8 +25,8 @@
         logstash_ver: "8.11.1"
         kibana_ver: "8.11.1"
         grafana_ver: "10.0.3"
-        #------ SQUID -----------------
-        squid_ver: "5.7"
+        #------ SQUID ----------------- (removed - no longer needed with spack)
+        # squid_ver: "5.7"
         #------ APPTAINER -------------
         apptainer_ver: "1.3.0"
         #------ OS NAME & VERSION -----
@@ -75,7 +75,7 @@
   roles:
     - {role: core/roles/network, tags: 'network', when: network_checkpoint is failed}
     - {role: components/warewulf, tags: 'warewulf', when: network_checkpoint is success}
-    - {role: components/squid, tags: 'squid', when: squid_enabled | default(true)}
+    # - {role: components/squid, tags: 'squid', when: squid_enabled | default(true)}  # Removed - squid no longer needed with spack
     - {role: components/slurm, tags: 'slurm'}
     - {role: components/spack, tags: 'spack'}
     - {role: components/elk, tags: 'elk', when: monitoring_enabled | default(true)}
@@ -158,6 +158,6 @@
     - components/slurm
     - components/spack
     - tools/roles/monitoring
-    - components/squid
+    # - components/squid  # Removed - squid no longer needed with spack
     - components/apptainer
     - components/globus

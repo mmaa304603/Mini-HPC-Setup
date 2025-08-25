@@ -2,27 +2,29 @@
 
 This directory contains the implementation code for the Mini HPC cluster setup. The code is organized into two main configuration methods: Ansible and shell scripts.
 
-## Directory Structure
+## Architecture Overview
 
-```
-src/
-├── ansible/      # Ansible-based configuration
-│   ├── roles/    # Ansible roles
-│   ├── playbooks/# Ansible playbooks
-│   ├── inventory/# Inventory files
-│   └── vars/     # Variable files
-│
-├── shell/        # Shell script-based configuration
-│   ├── bin/      # Executable scripts
-│   ├── lib/      # Library scripts
-│   ├── config/   # Configuration files
-│   └── templates/# Template files
-│
-└── common/       # Common utilities
-    ├── utils/    # Shared utilities
-    ├── helpers/  # Helper functions
-    └── templates/# Common templates
-```
+The Mini cluster consists of:
+- **Head Node**: One Radxa X2L with 2TB SSD
+- **CPU Compute Nodes**: Three Radxa X2L without external storage  
+- **GPU Compute Node**: One Jetson Orin Nano with 512GB SSD
+
+Network configuration uses 10.0.0.0/22 subnet with head node at 10.0.0.1 and compute nodes at 10.0.2.1-10.0.2.4.
+
+## Setup Flow
+
+### Prerequisites
+1. Install Rocky Linux 9.6 on head node
+2. Jetson Orin Nano is flashed (can be done with Ubuntu host: [Jetson AI Lab Setup Guide](https://www.jetson-ai-lab.com/initial_setup_jon_sdkm.html))
+
+### Cluster Setup Steps
+1. Set up network configuration
+2. Install and configure Warewulf
+3. Install and configure SLURM
+4. Use Spack for package management
+5. Configure Lmod to load packages for users
+6. Set up logging management (ELK stack)
+7. Configure system monitoring (MonSTER + Grafana)
 
 ## Implementation Methods
 
@@ -35,6 +37,7 @@ src/
   - Inventory management
   - Role-based organization
   - Template-based configuration
+  - Package management via Spack (replaces Squid proxy)
 
 ### Shell Method
 - Located in `src/shell/`
@@ -45,6 +48,7 @@ src/
   - Script-based automation
   - Template-based configuration
   - System-level operations
+  - Package management via Spack (replaces Squid proxy)
 
 ### Common Utilities
 - Located in `src/common/`
@@ -71,9 +75,3 @@ src/
 - Must follow style guidelines
 - Must include tests
 
-## Support
-
-For implementation issues:
-- Email: hpc-dev@ttu.edu
-- Documentation: `docs/development/implementation.md`
-- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues) 

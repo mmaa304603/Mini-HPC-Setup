@@ -2,6 +2,21 @@
 
 This directory contains the Ansible-based implementation of the Mini HPC cluster setup.
 
+## Setup Flow
+
+### Prerequisites
+1. Install Rocky Linux 9.6 on head node
+2. Jetson Orin Nano is flashed (can be done with Ubuntu host: [Jetson AI Lab Setup Guide](https://www.jetson-ai-lab.com/initial_setup_jon_sdkm.html))
+
+### Cluster Setup Steps
+1. Set up network configuration
+2. Install and configure Warewulf
+3. Install and configure SLURM
+4. Use Spack for package management
+5. Configure Lmod to load packages for users
+6. Set up logging management (ELK stack)
+7. Configure system monitoring (MonSTER + Grafana)
+
 ## Directory Structure
 
 ```
@@ -33,7 +48,6 @@ ansible/
     ├── elk/       # ELK implementation
     ├── grafana/   # Grafana implementation
     ├── filebeat/  # Filebeat implementation
-    ├── squid/     # Squid implementation
     └── apptainer/ # Apptainer implementation
 ```
 

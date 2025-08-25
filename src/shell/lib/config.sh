@@ -30,7 +30,7 @@ load_all_configs() {
     load_config "slurm.conf"
     load_config "spack.conf"
     load_config "monitoring.conf"
-    load_config "squid.conf"
+    # load_config "squid.conf"  # Removed - squid no longer needed with spack
     load_config "apptainer.conf"
     
     # Load Warewulf configuration from the Warewulf directory
@@ -71,12 +71,12 @@ export_config() {
     export GRAFANA_ENABLED
     export FILEBEAT_ENABLED
     
-    # Squid configuration
-    export SQUID_PORT
-    export SQUID_CACHE_MEM
-    export SQUID_MAX_OBJECT_SIZE
-    export SQUID_CACHE_DIR
-    export SQUID_ALLOWED_NETWORKS
+    # Squid configuration - removed, no longer needed with spack
+# export SQUID_PORT
+# export SQUID_CACHE_MEM
+# export SQUID_MAX_OBJECT_SIZE
+# export SQUID_CACHE_DIR
+# export SQUID_ALLOWED_NETWORKS
     
     # Apptainer configuration
     export APPTAINER_VERSION
@@ -143,10 +143,11 @@ LOG_FILE="${LOG_DIR}/setup.log"
 
 # Component enablement flags
 NETWORK_SETUP_ENABLED=true
+WAREWULF_ENABLED=true
 SLURM_ENABLED=true
 SPACK_ENABLED=true
 MONITORING_ENABLED=true
-SQUID_ENABLED=true
+SQUID_ENABLED=false  # Removed - squid no longer needed with spack
 APPTAINER_ENABLED=true
 
 # Network configuration
@@ -170,16 +171,16 @@ MONITORING_GRAFANA_ENABLED=true
 MONITORING_PROMETHEUS_ENABLED=true
 MONITORING_NODE_EXPORTER_ENABLED=true
 
-# Squid configuration
-SQUID_VERSION="5.9"
-SQUID_PORT="3128"
-SQUID_CACHE_MEM="256 MB"
-SQUID_MAX_OBJECT_SIZE="4096 KB"
-SQUID_CACHE_DIR="10000 MB"
-SQUID_CACHE_LEVELS="2"
-SQUID_ALLOWED_NETWORKS=("10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16")
-SQUID_AUTH_ENABLED=true
-SQUID_SSL_ENABLED=true
+# Squid configuration - removed, no longer needed with spack
+# SQUID_VERSION="5.9"
+# SQUID_PORT="3128"
+# SQUID_CACHE_MEM="256 MB"
+# SQUID_MAX_OBJECT_SIZE="4096 KB"
+# SQUID_CACHE_DIR="10000 MB"
+# SQUID_CACHE_LEVELS="2"
+# SQUID_ALLOWED_NETWORKS=("10.0.0.0/8" "172.16.0.0/12" "192.168.0.0/16")
+# SQUID_AUTH_ENABLED=true
+# SQUID_SSL_ENABLED=true
 
 # Apptainer configuration
 APPTAINER_VERSION="3.11.5"
