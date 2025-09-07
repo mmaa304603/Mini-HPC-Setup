@@ -1,116 +1,254 @@
 # Shell Implementation
 
-This directory contains the shell script-based implementation of the Mini HPC cluster setup.
+Bash-based scripts and tooling for provisioning, configuring, and managing the Mini-HPC cluster setup.
+
+## Architecture Overview
+
+This shell implementation provides a modular, maintainable approach to HPC cluster management with clear separation of concerns:
+
+- **📁 bin/** - User-facing entry points and automation scripts
+- **📁 lib/** - Shared utilities and functions (DRY principle)
+- **📁 config/** - Centralized configuration management
+- **📁 components/** - Individual service installers/configurators
+- **📁 maintenance/** - Operational scripts for ongoing cluster management
+- **📁 templates/** - Static configuration templates
 
 ## Directory Structure
 
 ```
-shell/
-├── bin/          # Executable scripts
-│   ├── core/     # Core functionality
-│   ├── setup/    # Setup scripts
-│   └── tools/    # Utility scripts
+src/shell/
+├── bin/                    # 🚀 Entry Points & Automation
+│   ├── hpc-setup          # Main cluster setup orchestrator
+│   ├── hpc-manage         # Main cluster management CLI
+│   ├── hpc-monitor        # Monitoring and health checks
+│   ├── hpc-backup         # Backup management
+│   ├── hpc-security       # Security hardening
+│   ├── hpc-test           # Testing and validation
+│   ├── build.sh           # Build distribution packages
+│   ├── deploy.sh          # Deploy built packages
+│   ├── cleanup.sh         # Clean build artifacts
+│   └── setup-dev-env.sh   # Development environment setup
 │
-├── lib/          # Library scripts
-│   ├── core/     # Core libraries
-│   ├── setup/    # Setup libraries
-│   └── tools/    # Utility libraries
+├── lib/                   # 🔧 Shared Libraries (DRY)
+│   ├── functions.sh       # Core utilities (logging, validation, system ops)
+│   ├── config.sh          # Configuration loading/export helpers
+│   └── install.sh         # Environment Modules installer
 │
-├── config/       # Configuration files
-│   ├── core/     # Core configurations
-│   ├── setup/    # Setup configurations
-│   └── tools/    # Utility configurations
+├── config/                # ⚙️ Configuration Management
+│   ├── network.conf       # Network topology and IP assignments
+│   ├── slurm.conf         # SLURM cluster configuration
+│   ├── spack.conf         # Spack package manager settings
+│   ├── monitoring.conf    # ELK/Grafana/Prometheus stack config
+│   ├── squid.conf         # Squid proxy configuration
+│   └── apptainer.conf     # Apptainer container settings
 │
-├── templates/    # Template files
-│   ├── core/     # Core templates
-│   ├── setup/    # Setup templates
-│   └── tools/    # Utility templates
+├── components/            # 🏗️ Service Installers
+│   ├── warewulf/          # Bare-metal provisioning system
+│   ├── slurm/             # Workload manager and scheduler
+│   ├── spack/             # Package manager for HPC software
+│   ├── elk/               # Elasticsearch, Logstash, Kibana
+│   ├── grafana/           # Metrics visualization
+│   ├── globus/            # Data transfer and sharing
+│   ├── eraider/           # Authentication and identity
+│   ├── squid/             # HTTP proxy and caching
+│   └── apptainer/         # Container runtime
 │
-└── components/   # Component implementations
-    ├── slurm/    # SLURM implementation
-    ├── warewulf/ # Warewulf implementation
-    ├── spack/    # Spack implementation
-    ├── globus/   # Globus implementation
-    ├── eraider/  # Eraider implementation
-    ├── elk/      # ELK implementation
-    ├── grafana/  # Grafana implementation
-    ├── filebeat/ # Filebeat implementation
-    ├── squid/    # Squid implementation
-    └── apptainer/# Apptainer implementation
+├── maintenance/           # 🔄 Operational Scripts
+│   ├── setup.sh           # Monitoring stack installation
+│   ├── backup.sh          # Data backup operations
+│   ├── backup_config.sh   # Configuration backup
+│   ├── verify_backup.sh   # Backup integrity verification
+│   ├── maintenance_daily.sh # Daily health checks and cleanup
+│   └── security_scan.sh   # Security auditing and hardening
+│
+└── templates/             # 📄 Configuration Templates
+    └── [static templates used by component scripts]
 ```
 
-## Implementation Details
+## Quickstart
 
-### Core Components
-- Located in `components/`
-- Each component has its own directory
-- Contains installation, configuration, and management scripts
-- Follows consistent structure:
-  ```
-  component/
-  ├── install.sh    # Installation script
-  ├── config.sh     # Configuration script
-  ├── manage.sh     # Management script
-  ├── templates/    # Component templates
-  └── config/       # Component configurations
-  ```
-
-### Script Organization
-- **Binaries** (`bin/`): Executable scripts
-  - `core/`: Core functionality scripts
-  - `setup/`: Setup and installation scripts
-  - `tools/`: Utility and helper scripts
-
-- **Libraries** (`lib/`): Shared functions
-  - `core/`: Core functionality libraries
-  - `setup/`: Setup and installation libraries
-  - `tools/`: Utility and helper libraries
-
-- **Configurations** (`config/`): Configuration files
-  - `core/`: Core configuration files
-  - `setup/`: Setup configuration files
-  - `tools/`: Utility configuration files
-
-- **Templates** (`templates/`): Template files
-  - `core/`: Core template files
-  - `setup/`: Setup template files
-  - `tools/`: Utility template files
-
-## Usage
-
-### Installation
+### 🚀 Getting Started
 ```bash
-# Install a component
-./components/slurm/install.sh
+# Navigate to shell implementation
+cd src/shell
 
-# Configure a component
-./components/slurm/config.sh
+# Check available management commands
+./bin/hpc-setup --help
+./bin/hpc-manage --help
+./bin/hpc-monitor --help
+./bin/hpc-security --help
 
-# Manage a component
-./components/slurm/manage.sh
+# Install a specific component (e.g., Warewulf provisioning)
+./components/warewulf/install.sh
+
+# Run daily maintenance tasks
+./maintenance/maintenance_daily.sh
 ```
 
-### Development
+### 🏗️ Typical Workflow
+```bash
+# 1. Configure your cluster settings
+vim config/network.conf
+vim config/slurm.conf
 
-#### Adding New Components
-1. Create component directory in `components/`
-2. Add required scripts:
-   - `install.sh`
-   - `config.sh`
-   - `manage.sh`
-3. Add templates and configurations
-4. Update documentation
+# 2. Install all components (orchestrated setup)
+./bin/hpc-setup --step all          # Install all components with checkpointing
 
-#### Script Requirements
-- Must be well-documented
-- Must include error handling
-- Must use common utilities
-- Must follow style guidelines
-- Must include tests
+# OR install components individually:
+./bin/hpc-setup --step slurm        # Install only SLURM
+./bin/hpc-setup --step spack        # Install only Spack
+./bin/hpc-setup --step monitoring   # Install monitoring stack
 
-## Support
+# 3. Verify installation
+./bin/hpc-test --all
 
-For shell implementation issues:
-- Email: hpc-dev@ttu.edu
-- Documentation: `docs/development/shell.md`
-- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues) 
+# 4. Start daily operations
+./maintenance/maintenance_daily.sh
+```
+
+## Setup Scripts Clarification
+
+### 🎯 **Two Different Setup Scripts**
+
+**`bin/hpc-setup`** - Main cluster setup orchestrator
+- **Purpose**: Orchestrates installation of all HPC components
+- **Features**: Checkpointing, component selection, error recovery
+- **Usage**: `./bin/hpc-setup --step all` or `./bin/hpc-setup --step slurm`
+- **Scope**: Full cluster deployment and component management
+
+**`maintenance/setup.sh`** - Monitoring stack installer
+- **Purpose**: Installs only the monitoring stack (ELK/Grafana)
+- **Features**: Focused on monitoring infrastructure
+- **Usage**: Called by `hpc-setup` when `--step monitoring` is used
+- **Scope**: Monitoring components only
+
+### 🔄 **Relationship**
+- `hpc-setup` calls `maintenance/setup.sh` when monitoring is requested
+- `maintenance/setup.sh` is a specialized installer for monitoring components
+- Use `hpc-setup` for full cluster deployment, `maintenance/setup.sh` for monitoring-only
+
+## Design Principles
+
+### 🔧 Modular Architecture
+- **Separation of Concerns**: Each directory has a specific purpose
+- **DRY Principle**: Shared functionality in `lib/` prevents code duplication
+- **Configuration-Driven**: All settings externalized to `config/` files
+- **Component-Based**: Each service has its own installer in `components/`
+
+### 📋 Coding Conventions
+
+#### Library Sourcing
+```bash
+# Always source libraries first (adjust path based on location)
+source "$(dirname "$0")/../../lib/functions.sh"  # From components/
+source "$(dirname "$0")/../lib/functions.sh"     # From bin/
+source "$(dirname "$0")/../../lib/config.sh"
+```
+
+#### Privilege Management
+```bash
+# Guard privileged operations
+check_root   # Ensures script runs as root when needed
+```
+
+#### Configuration Loading
+```bash
+# Load only needed configurations
+load_config "network.conf"  # Load specific config file
+export_config               # Make variables available to child processes
+```
+
+#### Configuration Format
+```bash
+# Simple KEY=VALUE pairs in .conf files
+HEAD_NODE_IP="10.0.0.1"
+NETWORK_MASK="255.255.252.0"
+CLUSTER_NAME="hpc-cluster"
+```
+
+#### Error Handling
+```bash
+# Robust error handling pattern
+install_package "slurm" || {
+    error "Failed to install SLURM"
+    return 1
+}
+```
+
+## Component Details
+
+### 🏗️ Service Installers (`components/`)
+Each component provides self-contained installation and configuration:
+
+- **`warewulf/`** - Bare-metal provisioning system for managing compute nodes
+- **`slurm/`** - Job scheduler and workload manager for HPC workloads  
+- **`spack/`** - Package manager for scientific software installation
+- **`elk/`** - Elasticsearch, Logstash, Kibana for log aggregation and analysis
+- **`grafana/`** - Metrics visualization and dashboard platform
+- **`globus/`** - Secure data transfer and sharing capabilities
+- **`eraider/`** - Authentication and identity management
+- **`squid/`** - HTTP proxy and caching for improved performance
+- **`apptainer/`** - Container runtime for reproducible environments
+
+### 🔄 Operational Scripts (`maintenance/`)
+Essential for ongoing cluster management:
+
+- **`setup.sh`** - Installs monitoring stack (ELK/Grafana) - *Note: Different from bin/hpc-setup*
+- **`backup.sh`** - Comprehensive data backup operations
+- **`backup_config.sh`** - Configuration file backup and versioning
+- **`verify_backup.sh`** - Backup integrity verification
+- **`maintenance_daily.sh`** - Daily health checks, log rotation, cleanup
+- **`security_scan.sh`** - Security auditing with Lynis, rkhunter, ClamAV
+
+### 🚀 Entry Points (`bin/`)
+User-facing commands for cluster management:
+
+- **`hpc-setup`** - Main cluster setup orchestrator with checkpointing
+- **`hpc-manage`** - Main cluster management CLI
+- **`hpc-monitor`** - Health monitoring and status checks
+- **`hpc-backup`** - Backup management interface
+- **`hpc-security`** - Security hardening and auditing
+- **`hpc-test`** - Testing and validation suite
+
+## Why This Structure Works
+
+### ✅ **Maintainability**
+- Clear separation between installation, configuration, and operations
+- Shared libraries prevent code duplication
+- Configuration externalized for easy customization
+
+### ✅ **Scalability** 
+- Component-based approach allows adding new services easily
+- Modular design supports different deployment scenarios
+- Configuration-driven approach scales to different cluster sizes
+
+### ✅ **Reliability**
+- Consistent error handling and logging across all scripts
+- Backup and verification procedures built-in
+- Security scanning and hardening automated
+
+### ✅ **Usability**
+- Simple entry points for common operations
+- Clear documentation and examples
+- Standardized configuration format
+
+## Development Guidelines
+
+### 🎯 **Best Practices**
+- **Use library functions**: Leverage `lib/functions.sh` utilities (logging, validation, system ops)
+- **Configuration-driven**: Keep all settings in `config/` files, never hardcode values
+- **Error handling**: Use `|| { error "message"; return 1; }` pattern consistently
+- **Code organization**: Place shared logic in `lib/`, not in entry points
+
+### 🔧 **Adding New Components**
+1. Create directory in `components/`
+2. Add `install.sh` script following existing patterns
+3. Source libraries: `source "$(dirname "$0")/../../lib/functions.sh"`
+4. Load configuration: `load_config "component.conf"`
+5. Use standard functions: `check_root`, `info`, `error`, `install_package`
+
+## Support & Documentation
+
+- **📚 Documentation**: `docs/development/`
+- **🐛 Issues**: https://github.com/ttu-hpc/Mini-HPC-Setup/issues
+- **💬 Community**: HPC development team discussions

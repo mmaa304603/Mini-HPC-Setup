@@ -1,36 +1,29 @@
-# Configuration Files
+# Configuration
 
-This directory contains configuration files for the HPC cluster.
+User-editable configuration consumed by scripts in `src/shell/components/` and `src/shell/bin/`.
 
-## Structure
+## Files
 
-```
-config/
-├── core/     # Core configurations
-├── setup/    # Setup configurations
-└── tools/    # Utility configurations
-```
+Top-level `.conf` files (key=value) loaded via `lib/config.sh`:
 
-## Usage
+- `network.conf`, `slurm.conf`, `spack.conf`, `monitoring.conf`, `squid.conf`, `apptainer.conf`
 
-Configuration files are sourced by scripts to set environment variables and parameters.
+## Loading configuration in scripts
 
 ```bash
-# Source configuration in scripts
-source "$(dirname "$0")/../config/core/config.sh"
-source "$(dirname "$0")/../config/setup/config.sh"
-source "$(dirname "$0")/../config/tools/config.sh"
+source "$(dirname "$0")/../lib/functions.sh"
+source "$(dirname "$0")/../lib/config.sh"
+
+# Load what you need
+load_config "network.conf"
+load_config "slurm.conf"
+
+# Make variables available to child processes
+export_config
 ```
 
-## Dependencies
+## Tips
 
-- Common utilities from `src/common/utils/`
-- Library scripts from `src/shell/lib/`
-- Templates from `src/shell/templates/`
-
-## Support
-
-For configuration issues:
-- Email: hpc-dev@ttu.edu
-- Documentation: `docs/development/config.md`
-- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues) 
+- Keep values simple: `KEY=VALUE` with no quotes unless needed.
+- Do not commit secrets; use environment variables or separate, ignored files.
+- YAML such as Warewulf config is generated/consumed by components and not sourced directly.

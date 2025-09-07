@@ -1,17 +1,12 @@
 #!/bin/bash
 
-# Source common utilities
-source "$(dirname "$0")/../../common/utils/logging.sh"
-source "$(dirname "$0")/../../common/utils/error.sh"
-source "$(dirname "$0")/../../common/utils/validation.sh"
-
 # Source library scripts
-source "$(dirname "$0")/../lib/config.sh"
 source "$(dirname "$0")/../lib/functions.sh"
+source "$(dirname "$0")/../lib/config.sh"
 
-# Source configuration
-source "$(dirname "$0")/../config/core/config.sh"
-source "$(dirname "$0")/../config/setup/config.sh"
+# Load configuration
+load_config "monitoring.conf"
+export_config
 
 # Check if running as root
 check_root

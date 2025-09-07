@@ -13,15 +13,26 @@ src/
 │   └── vars/     # Variable files
 │
 ├── shell/        # Shell script-based configuration
-│   ├── bin/      # Executable scripts
-│   ├── lib/      # Library scripts
+│   ├── bin/      # Entry points and automation scripts
+│   │   ├── hpc-setup    # Main cluster setup orchestrator
+│   │   ├── hpc-manage   # Cluster management CLI
+│   │   ├── hpc-monitor  # Health monitoring
+│   │   ├── hpc-backup   # Backup management
+│   │   ├── hpc-security # Security hardening
+│   │   └── hpc-test     # Testing and validation
+│   ├── lib/      # Shared libraries (DRY principle)
+│   │   ├── functions.sh # Core utilities
+│   │   ├── config.sh    # Configuration management
+│   │   └── install.sh   # Environment Modules installer
 │   ├── config/   # Configuration files
-│   └── templates/# Template files
+│   ├── components/ # Individual service installers
+│   ├── maintenance/ # Operational scripts
+│   └── templates/ # Configuration templates
 │
-└── common/       # Common utilities
-    ├── utils/    # Shared utilities
-    ├── helpers/  # Helper functions
-    └── templates/# Common templates
+└── common/       # Cross-method shared utilities
+    ├── utils/    # Shared utility scripts
+    ├── helpers/  # Helper functions (currently empty)
+    └── templates/# Common templates (currently empty)
 ```
 
 ## Implementation Methods
@@ -39,12 +50,14 @@ src/
 ### Shell Method
 - Located in `src/shell/`
 - Uses imperative configuration
-- Script-based organization
+- Modular script-based organization
 - Features:
-  - Direct system control
-  - Script-based automation
-  - Template-based configuration
-  - System-level operations
+  - **Entry Points** (`bin/`): Main orchestration scripts with checkpointing
+  - **Components** (`components/`): Individual service installers
+  - **Libraries** (`lib/`): Shared utilities following DRY principle
+  - **Maintenance** (`maintenance/`): Operational and monitoring scripts
+  - **Configuration** (`config/`): Centralized configuration management
+  - Direct system control and template-based configuration
 
 ### Common Utilities
 - Located in `src/common/`
@@ -54,6 +67,35 @@ src/
   - Shared templates
   - Helper utilities
   - Cross-method tools
+
+## Directory Overlaps and Consolidation
+
+### Current Overlaps
+There are some functional overlaps between directories that should be addressed:
+
+**Logging Functions:**
+- `src/common/utils/logging.sh` - Advanced logging with levels and file output
+- `src/shell/lib/functions.sh` - Basic logging with colors and console output
+
+**Error Handling:**
+- `src/common/utils/error.sh` - Comprehensive error handling with error codes
+- `src/shell/lib/functions.sh` - Basic error functions
+
+**Validation:**
+- `src/common/utils/validate.sh` - Input validation utilities
+- `src/common/utils/validation.sh` - Additional validation functions
+
+### Consolidation Strategy
+1. **Keep `src/shell/lib/`** as the primary library for shell scripts
+2. **Migrate useful functions** from `src/common/utils/` to `src/shell/lib/`
+3. **Use `src/common/`** only for truly cross-method utilities (Ansible + Shell)
+4. **Empty directories** (`helpers/`, `templates/`) should be populated or removed
+
+### Recommended Actions
+- Consolidate logging functions into `src/shell/lib/functions.sh`
+- Merge error handling approaches
+- Remove duplicate validation scripts
+- Populate or remove empty `common/` subdirectories
 
 ## Development
 

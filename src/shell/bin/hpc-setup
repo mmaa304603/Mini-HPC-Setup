@@ -1,11 +1,15 @@
 #!/bin/bash
 
+# HPC Cluster Setup Orchestrator
+# Main entry point for setting up HPC cluster components with checkpointing
+
 # Source common functions and configuration
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-source "${SCRIPT_DIR}/common/functions.sh"
-source "${SCRIPT_DIR}/common/config.sh"
-source "${SCRIPT_DIR}/utils/validate.sh"
-source "${SCRIPT_DIR}/utils/checkpoint.sh"
+SHELL_DIR="$(dirname "$SCRIPT_DIR")"
+source "${SHELL_DIR}/lib/functions.sh"
+source "${SHELL_DIR}/lib/config.sh"
+source "${SHELL_DIR}/common/utils/validate.sh"
+source "${SHELL_DIR}/common/utils/checkpoint.sh"
 
 # Function to create log directory
 setup_logging() {
@@ -22,16 +26,12 @@ run_installations() {
     # Initialize checkpoint system
     init_checkpoints
     
-    # Network setup
+    # Network setup (handled by Warewulf)
     if [ "${NETWORK_SETUP_ENABLED}" = true ]; then
         if ! verify_checkpoint "network_setup"; then
-            log_info "Running network setup..."
-            if ! "${SCRIPT_DIR}/network/setup.sh"; then
-                log_error "Network setup failed"
-                failed=1
-            else
-                create_checkpoint "network_setup"
-            fi
+            log_info "Network setup is handled by Warewulf provisioning system..."
+            log_info "Skipping separate network setup step"
+            create_checkpoint "network_setup"
         else
             log_info "Network setup checkpoint found, skipping..."
         fi
@@ -41,7 +41,7 @@ run_installations() {
     if [ "${SLURM_ENABLED}" = true ]; then
         if ! verify_checkpoint "slurm_setup"; then
             log_info "Running SLURM setup..."
-            if ! "${SCRIPT_DIR}/slurm/setup.sh"; then
+            if ! "${SHELL_DIR}/components/slurm/install.sh"; then
                 log_error "SLURM setup failed"
                 failed=1
             else
@@ -56,7 +56,7 @@ run_installations() {
     if [ "${SPACK_ENABLED}" = true ]; then
         if ! verify_checkpoint "spack_setup"; then
             log_info "Running Spack setup..."
-            if ! "${SCRIPT_DIR}/spack/setup.sh"; then
+            if ! "${SHELL_DIR}/components/spack/install.sh"; then
                 log_error "Spack setup failed"
                 failed=1
             else
@@ -71,7 +71,7 @@ run_installations() {
     if [ "${MONITORING_ENABLED}" = true ]; then
         if ! verify_checkpoint "monitoring_setup"; then
             log_info "Running monitoring setup..."
-            if ! "${SCRIPT_DIR}/monitoring/setup.sh"; then
+            if ! "${SHELL_DIR}/maintenance/setup.sh"; then
                 log_error "Monitoring setup failed"
                 failed=1
             else
@@ -86,7 +86,7 @@ run_installations() {
     if [ "${SQUID_ENABLED}" = true ]; then
         if ! verify_checkpoint "squid_setup"; then
             log_info "Running Squid setup..."
-            if ! "${SCRIPT_DIR}/squid/setup.sh"; then
+            if ! "${SHELL_DIR}/components/squid/install.sh"; then
                 log_error "Squid setup failed"
                 failed=1
             else
@@ -101,7 +101,7 @@ run_installations() {
     if [ "${APPTAINER_ENABLED}" = true ]; then
         if ! verify_checkpoint "apptainer_setup"; then
             log_info "Running Apptainer setup..."
-            if ! "${SCRIPT_DIR}/apptainer/setup.sh"; then
+            if ! "${SHELL_DIR}/components/apptainer/install.sh"; then
                 log_error "Apptainer setup failed"
                 failed=1
             else
@@ -115,13 +115,62 @@ run_installations() {
     return $failed
 }
 
+# Function to display usage information
+show_usage() {
+    cat << EOF
+HPC Cluster Setup Orchestrator
+
+USAGE:
+    $0 [OPTIONS]
+
+DESCRIPTION:
+    Orchestrates the installation and configuration of HPC cluster components
+    with built-in checkpointing for reliable deployment and recovery.
+
+OPTIONS:
+    --step COMPONENT     Install specific component (network|slurm|spack|monitoring|squid|apptainer|all)
+    --list-checkpoints   List all available checkpoints
+    --clear-checkpoint   Clear specific checkpoint
+    --clear-all-checkpoints  Clear all checkpoints
+    --help              Show this help message
+
+EXAMPLES:
+    $0 --step all                    # Install all components
+    $0 --step slurm                  # Install only SLURM
+    $0 --list-checkpoints            # Show checkpoint status
+    $0 --clear-checkpoint slurm_setup # Clear SLURM checkpoint
+
+COMPONENTS:
+    network      - Network configuration and setup
+    slurm        - SLURM job scheduler and workload manager
+    spack        - Spack package manager for HPC software
+    monitoring   - ELK/Grafana monitoring stack
+    squid        - HTTP proxy and caching
+    apptainer    - Container runtime for reproducible environments
+    all          - Install all components (default)
+
+EOF
+}
+
 # Function to handle command line arguments
 handle_args() {
     local action=""
     local checkpoint=""
     
+    # Default to installing all components
+    NETWORK_SETUP_ENABLED=true
+    SLURM_ENABLED=true
+    SPACK_ENABLED=true
+    MONITORING_ENABLED=true
+    SQUID_ENABLED=true
+    APPTAINER_ENABLED=true
+    
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --help)
+                show_usage
+                exit 0
+                ;;
             --list-checkpoints)
                 list_checkpoints
                 exit 0
@@ -202,12 +251,14 @@ handle_args() {
                         ;;
                     *)
                         log_error "Invalid step: $action"
+                        show_usage
                         exit 1
                         ;;
                 esac
                 ;;
             *)
                 log_error "Unknown option: $1"
+                show_usage
                 exit 1
                 ;;
         esac
@@ -247,4 +298,4 @@ main() {
 # Run main function if script is executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
-fi 
+fi

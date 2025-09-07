@@ -1,35 +1,27 @@
-# Template Files
+# Templates
 
-This directory contains template files used for configuration generation.
+Static templates used by component scripts to render config files.
 
-## Structure
+## Where used
 
-```
-templates/
-├── core/     # Core templates
-├── setup/    # Setup templates
-└── tools/    # Utility templates
-```
+- Component scripts under `src/shell/components/**` copy or render templates as part of install/configure steps.
 
-## Usage
+## Example: render from template
 
-Templates are used to generate configuration files with variable substitution.
+If you maintain a rendering helper (e.g., `generate_config`), source it and run:
 
 ```bash
-# Generate configuration from template
+source "$(dirname "$0")/../lib/functions.sh"
 source "$(dirname "$0")/../lib/config.sh"
-generate_config "$(dirname "$0")/../templates/core/template.conf" "$(dirname "$0")/../config/core/config.conf"
+
+load_config "network.conf"
+
+# Example paths
+TEMPLATE_PATH="$(dirname "$0")/../templates/core/example.conf.j2"
+OUTPUT_PATH="/etc/example.conf"
+
+# hypothetical helper (implement if needed)
+generate_config "$TEMPLATE_PATH" "$OUTPUT_PATH"
 ```
 
-## Dependencies
-
-- Common utilities from `src/common/utils/`
-- Library scripts from `src/shell/lib/`
-- Configuration from `src/shell/config/`
-
-## Support
-
-For template issues:
-- Email: hpc-dev@ttu.edu
-- Documentation: `docs/development/templates.md`
-- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues) 
+Otherwise, simple templates are often copied and then edited by the scripts themselves.

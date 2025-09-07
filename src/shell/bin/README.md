@@ -1,50 +1,37 @@
-# Executable Scripts
+# Executables (bin)
 
-This directory contains executable scripts for managing the HPC cluster.
+Entry points and helper scripts for shell-based operations.
 
-## Scripts
+## Contents
 
-### Core Scripts
-- `hpc-manage` - Main cluster management script
-- `hpc-monitor` - Cluster monitoring script
-- `hpc-backup` - Backup management script
-- `hpc-security` - Security management script
-- `hpc-test` - Testing and validation script
-
-### Setup Scripts
-- `setup-dev-env.sh` - Setup development environment
-- `build.sh` - Build cluster components
-- `deploy.sh` - Deploy cluster components
-- `cleanup.sh` - Cleanup cluster components
+- `hpc-manage` / `hpc_manage.sh`: cluster management entrypoints
+- `hpc-monitor`: monitoring entrypoint
+- `hpc-backup`: backup entrypoint
+- `hpc-security`: security/hardening entrypoint
+- `hpc-test`: test and validation entrypoint
+- `build.sh`: assemble distribution artifacts
+- `deploy.sh`: deploy built artifacts
+- `cleanup.sh`: clean build and temp outputs
+- `setup-dev-env.sh`: local dev environment setup
+- `core/`, `setup/`, `tools/`: helper subcommands/utilities
 
 ## Usage
 
 ```bash
-# Manage cluster
-./hpc-manage [command] [options]
+# Show help
+./hpc-manage --help
 
-# Monitor cluster
-./hpc-monitor [options]
+# Example: run validations
+./hpc-test --all
 
-# Backup cluster
-./hpc-backup [options]
+# Build and deploy
+./build.sh && ./deploy.sh
 
-# Security management
-./hpc-security [command] [options]
-
-# Test cluster
-./hpc-test [options]
+# Cleanup outputs
+./cleanup.sh
 ```
 
-## Dependencies
+## Notes
 
-- Common utilities from `src/common/utils/`
-- Library scripts from `src/shell/lib/`
-- Configuration from `src/shell/config/`
-
-## Support
-
-For executable script issues:
-- Email: hpc-dev@ttu.edu
-- Documentation: `docs/development/bin.md`
-- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues) 
+- Executables source libraries from `../lib/` and configs from `../config/`.
+- Ensure scripts are executable: `chmod +x ./hpc-* ./*.sh`.
