@@ -55,8 +55,8 @@ run_test "globus" "Globus Setup"
 # Test spack role
 run_test "spack" "Spack Configuration"
 
-# Test squid role
-run_test "squid" "Squid Proxy"
+# Test squid role - removed, no longer needed with spack
+# run_test "squid" "Squid Proxy"
 
 # Test elk role
 run_test "elk" "ELK Stack"

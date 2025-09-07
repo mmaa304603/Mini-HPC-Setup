@@ -7,21 +7,25 @@ This document provides detailed installation instructions for the HPC cluster se
 Before starting the installation, ensure you have:
 
 1. **Hardware Requirements**
-   - Head node with SSD storage
-   - 3 compute nodes (Radax X2L)
+   - Head node with SSD storage (Radxa X2L with 2TB SSD)
+   - 3 CPU compute nodes (Radxa X2L without external storage)
+   - 1 GPU compute node (Jetson Orin Nano with 512GB SSD)
    - Gigabit Ethernet network
    - Minimum 4GB RAM per node
    - Minimum 20GB free disk space on head node
 
 2. **Network Requirements**
    - Static IP for head node (10.0.0.1)
-   - DHCP range for compute nodes (10.0.1.1 - 10.0.1.255)
+   - DHCP range for compute nodes (10.0.1.1 - 10.0.1.3)
+   - Static node addresses (10.0.2.1 - 10.0.2.4)
    - Network interface for provisioning (enp2s0)
    - Open ports for Globus (443, 80, 2811, 50000-51000)
 
 3. **Base OS**
-   - Rocky Linux 9.5 installed on head node
-   - x86_64 architecture
+   - Rocky Linux 9.6 installed on head node
+   - Jetson Orin Nano flashed with OS (can be done with Ubuntu host: [Jetson AI Lab Setup Guide](https://www.jetson-ai-lab.com/initial_setup_jon_sdkm.html))
+   - x86_64 architecture for head and CPU nodes
+   - ARM64 architecture for GPU node
 
 ## Installation Methods
 
@@ -91,11 +95,13 @@ The Ansible installation method provides automated deployment.
 
 ## Component Installation Order
 
-1. **Base System**
-   - Network configuration
-   - System updates
-   - Basic utilities
-   - Firewall setup
+1. **Network Configuration**
+   - System update
+   - Set up network interfaces
+   - Configure DHCP and TFTP
+   - Set up firewall rules
+   - Configure routing
+   - Set up Tailscale for public access
 
 2. **Warewulf**
    - Install Warewulf 4.6
@@ -108,37 +114,35 @@ The Ansible installation method provides automated deployment.
    - Configure partitions
    - Set up job accounting
    - Configure resource limits
+   - Flux for potential upgraded solution
 
-4. **eRaider Authentication**
-   - Configure SSSD
-   - Set up LDAP integration
-   - Configure PAM and NSS
-   - Set up home directory creation
-
-5. **Globus Setup (Based on Sol Luna)**
-   - Install Globus Connect Server
-   - Configure storage gateway
-   - Set up mapped collections
-   - Configure security settings
-   - Set up self-diagnostic tools
-
-6. **Spack and Modules**
+4. **Spack Package Management**
    - Install Spack
-   - Configure environment modules
+   - Configure environment modules (Lmod)
    - Install required packages
    - Set up system-wide environment
 
-7. **Monitoring Stack**
-   - ELK stack
-   - Grafana
-   - Filebeat
-   - Configure dashboards
+5. **Logging Management (ELK Stack)**
+   - Install Elasticsearch
+   - Install Logstash
+   - Install Kibana
+   - Install Filebeat
+   - Configure log collection
 
-8. **Additional Components**
-   - Squid proxy
-   - Apptainer
-   - GitLab CI
-   - Benchmark tools
+6. **System Monitoring (MonSTER + Grafana)**
+   - Install Grafana for visualization
+   - TimescaleDB/Prometheus for database
+   - Use MonSTER for Collection API
+   - Configure monitoring dashboards
+   - Set up alerts using Alert Manager
+   - Configure system metrics collection
+
+7. **Additional Components**
+   - eRaider Authentication (SSSD/LDAP)
+   - Globus Connect Server
+   - Apptainer container runtime
+   - Jacamar CI
+   - Advanced performance profiling using Caliper, Thicket, and Hatchet
 
 ## Post-Installation
 

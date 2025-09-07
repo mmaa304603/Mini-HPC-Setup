@@ -12,7 +12,6 @@ This directory contains implementations of various HPC cluster components.
 - `elk/` - ELK logging stack
 - `grafana/` - Grafana monitoring
 - `filebeat/` - Filebeat log shipping
-- `squid/` - Squid proxy server
 - `apptainer/` - Apptainer container runtime
 
 ## Structure

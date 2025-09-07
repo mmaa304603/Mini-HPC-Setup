@@ -30,7 +30,7 @@ load_all_configs() {
     load_config "slurm.conf"
     load_config "spack.conf"
     load_config "monitoring.conf"
-    load_config "squid.conf"
+    # load_config "squid.conf"  # Removed - squid no longer needed with spack
     load_config "apptainer.conf"
     
     # Load Warewulf configuration from the Warewulf directory

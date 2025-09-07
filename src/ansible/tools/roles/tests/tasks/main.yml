@@ -38,7 +38,7 @@
     systemctl status elasticsearch
     systemctl status kibana
     systemctl status grafana-server
-    systemctl status squid
+    # systemctl status squid  # Removed - squid no longer needed with spack
     apptainer --version
   register: service_test_results
 

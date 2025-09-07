@@ -13,6 +13,20 @@ This shell implementation provides a modular, maintainable approach to HPC clust
 - **📁 maintenance/** - Operational scripts for ongoing cluster management
 - **📁 templates/** - Static configuration templates
 
+## Overall flow
+Prerequsites:
+1. Install Rocky Linux 9.6 on head node
+2. Jetson Orin Nano is flashed, this can be easily done with an ubuntu host (https://www.jetson-ai-lab.com/initial_setup_jon_sdkm.html)
+
+Cluster setup:
+1. Set up netwrok configuration
+2. Install and configure warewulf
+3. Install and configure slurm
+4. Use spack for package management
+5. Lmod to load packages for users
+6. Logging management: ELK
+7. System monitoring: MonsTER + Grafana
+
 ## Directory Structure
 
 ```

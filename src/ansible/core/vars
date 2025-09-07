@@ -80,13 +80,13 @@ filebeat_log_paths:
 filebeat_log_type: "slurm"
 filebeat_logstash_host: "localhost:5044"
 
-# Squid Configuration
-squid_enabled: true
-squid_port: 3128
-squid_cache_dir: "/var/spool/squid"
-squid_cache_size: 10000
-squid_max_object_size: 4096
-squid_visible_hostname: "headnode"
+# Squid Configuration - removed, no longer needed with spack
+# squid_enabled: true
+# squid_port: 3128
+# squid_cache_dir: "/var/spool/squid"
+# squid_cache_size: 10000
+# squid_max_object_size: 4096
+# squid_visible_hostname: "headnode"
 
 # Apptainer Configuration
 apptainer_enabled: true
@@ -99,10 +99,11 @@ apptainer_bind_paths:
 
 # Component enablement flags
 network_setup_enabled: true
+warewulf_enabled: true
 slurm_enabled: true
 spack_enabled: true
 monitoring_enabled: true
-squid_enabled: true
+squid_enabled: false  # Removed - squid no longer needed with spack
 apptainer_enabled: true
 
 # System requirements

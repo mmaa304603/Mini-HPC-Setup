@@ -12,7 +12,6 @@ This directory contains Ansible implementations of various HPC cluster component
 - `elk/` - ELK logging stack
 - `grafana/` - Grafana monitoring
 - `filebeat/` - Filebeat log shipping
-- `squid/` - Squid proxy server
 - `apptainer/` - Apptainer container runtime
 
 ## Structure
