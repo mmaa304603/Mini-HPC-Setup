@@ -7,6 +7,11 @@ Shared libraries providing common functionality for shell-based HPC setup script
 - **`functions.sh`** - Core utilities (logging, validation, system operations)
 - **`config.sh`** - Configuration loading and management
 - **`install.sh`** - Environment Modules installation helper
+- **`logging.sh`** - Advanced logging utilities with levels
+- **`error.sh`** - Error handling and error codes
+- **`validation.sh`** - Input validation functions
+- **`validate.sh`** - System environment validation
+- **`checkpoint.sh`** - Checkpoint system for tracking progress
 
 ## Usage in Components
 

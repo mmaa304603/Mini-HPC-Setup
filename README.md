@@ -7,7 +7,7 @@ This project provides tools and documentation for setting up a Mini HPC cluster 
 The Mini cluster has the following architecture:
 1. **Head Node**: One Radxa X2L with 2TB SSD
 2. **CPU Compute Nodes**: Three Radxa X2L without external storage
-3. **GPU Compute Node**: One Jetson Orin Nano with 512GB SSD (OS pre-flashed using Nvidia SDK manager)
+3. **GPU Compute Node**: One Jetson Orin Nano with 512GB SSD (Ubuntu 22.04 pre-flashed using [Nvidia SDK manager]( https://www.jetson-ai-lab.com/initial_setup_jon_sdkm.html))
 
 ## Network Configuration
 

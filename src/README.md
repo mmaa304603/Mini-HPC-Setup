@@ -51,43 +51,19 @@ Network configuration uses 10.0.0.0/22 subnet with head node at 10.0.0.1 and com
   - **Configuration** (`config/`): Centralized configuration management
   - Direct system control and template-based configuration
 
-### Common Utilities
-- Located in `src/common/`
-- Shared between both methods
-- Features:
-  - Common functions
-  - Shared templates
-  - Helper utilities
-  - Cross-method tools
 
-## Directory Overlaps and Consolidation
+## Shell Library Structure
 
-### Current Overlaps
-There are some functional overlaps between directories that should be addressed:
+The shell implementation uses a comprehensive library system in `src/shell/lib/`:
 
-**Logging Functions:**
-- `src/common/utils/logging.sh` - Advanced logging with levels and file output
-- `src/shell/lib/functions.sh` - Basic logging with colors and console output
-
-**Error Handling:**
-- `src/common/utils/error.sh` - Comprehensive error handling with error codes
-- `src/shell/lib/functions.sh` - Basic error functions
-
-**Validation:**
-- `src/common/utils/validate.sh` - Input validation utilities
-- `src/common/utils/validation.sh` - Additional validation functions
-
-### Consolidation Strategy
-1. **Keep `src/shell/lib/`** as the primary library for shell scripts
-2. **Migrate useful functions** from `src/common/utils/` to `src/shell/lib/`
-3. **Use `src/common/`** only for truly cross-method utilities (Ansible + Shell)
-4. **Empty directories** (`helpers/`, `templates/`) should be populated or removed
-
-### Recommended Actions
-- Consolidate logging functions into `src/shell/lib/functions.sh`
-- Merge error handling approaches
-- Remove duplicate validation scripts
-- Populate or remove empty `common/` subdirectories
+**Core Utilities:**
+- `functions.sh` - Basic system operations and logging
+- `config.sh` - Configuration loading and management
+- `logging.sh` - Advanced logging with levels
+- `error.sh` - Comprehensive error handling
+- `validation.sh` - Input validation functions
+- `validate.sh` - System environment validation
+- `checkpoint.sh` - Progress tracking system
 
 ## Development
 

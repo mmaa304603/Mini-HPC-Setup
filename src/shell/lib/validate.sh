@@ -1,9 +1,8 @@
 #!/bin/bash
 
-# Source common functions and configuration
+# Source common utilities
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-source "${SCRIPT_DIR}/../common/functions.sh"
-source "${SCRIPT_DIR}/../common/config.sh"
+source "${SCRIPT_DIR}/logging.sh"
 
 # Function to check OS version
 check_os_version() {
