@@ -16,15 +16,46 @@ This directory contains implementations of various HPC cluster components.
 
 ## Structure
 
-Each component follows this structure:
+Each component follows this structure with component-based configuration:
 ```
 component/
 ├── install.sh    # Installation script
-├── config.sh     # Configuration script
-├── manage.sh     # Management script
-├── templates/    # Component templates
-└── config/       # Component configurations
+├── configure.sh  # Configuration script
+├── component.conf # Component-specific configuration
+├── templates/    # Component templates (if needed)
+└── README.md     # Component documentation (if needed)
 ```
+
+### Configuration Management
+
+Each component manages its own configuration files:
+
+- **`network/network.conf`** - Network settings (IPs, interfaces, firewall)
+- **`slurm/slurm.conf`** - SLURM cluster configuration
+- **`spack/spack.conf`** - Spack package manager settings
+- **`warewulf/warewulf.conf`** - Warewulf provisioning configuration
+- **`grafana/monitoring.conf`** - Monitoring and alerting settings
+- **`apptainer/apptainer.conf`** - Container configuration
+
+### Loading Component Configuration
+
+```bash
+# In component scripts
+source "$(dirname "$0")/../../lib/functions.sh"
+source "$(dirname "$0")/../../lib/config.sh"
+
+# Load specific component configuration
+load_component_config "network"
+load_component_config "slurm"
+```
+
+### Benefits of Component-Based Configuration
+
+- ✅ **Logical grouping** - Config files with related scripts
+- ✅ **Easier maintenance** - All component files in one place
+- ✅ **Better modularity** - Components are self-contained
+- ✅ **Clearer dependencies** - Easy to see what each component needs
+- ✅ **Version control** - Easier to track changes per component
 
 ## Usage
 
@@ -41,10 +72,9 @@ component/
 
 ## Dependencies
 
-- Common utilities from `src/common/utils/`
 - Library scripts from `src/shell/lib/`
-- Configuration from `src/shell/config/`
-- Templates from `src/shell/templates/`
+- Component-specific configuration files
+- Global system configuration from `src/shell/config/config.conf`
 
 ## Support
 

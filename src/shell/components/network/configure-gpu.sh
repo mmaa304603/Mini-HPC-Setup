@@ -4,6 +4,9 @@
 source "$(dirname "$0")/../../lib/functions.sh"
 source "$(dirname "$0")/../../lib/config.sh"
 
+# Load network configuration
+load_component_config "network"
+
 # GPU Node Network Configuration
 # This script configures the network for the GPU compute node (Jetson Orin Nano)
 # IP: 10.0.2.4 (static assignment, not managed by Warewulf)
@@ -19,13 +22,13 @@ configure_gpu_network() {
     nmcli con delete "$GPU_NETWORK_INTERFACE" 2>/dev/null || true
     
     # Create NetworkManager connection for GPU node
-    nmcli con add type ethernet ifname "$GPU_NETWORK_INTERFACE" con-name gpu-cluster \
+    nmcli con add type ethernet ifname "$GPU_NETWORK_INTERFACE" con-name gpu \
       ip4 "$GPU_NODE_IP/22" \
       gw4 "$HEAD_NODE_IP" \
       connection.autoconnect yes
     
     # Activate the connection
-    nmcli con up gpu-cluster
+    nmcli con up gpu
     
     info "GPU node network interface configured successfully"
 }
@@ -35,10 +38,10 @@ configure_gpu_dns() {
     info "Configuring DNS for GPU node..."
     
     # Set DNS servers
-    nmcli con mod gpu-cluster ipv4.dns "8.8.8.8,8.8.4.4"
+    nmcli con mod gpu ipv4.dns "8.8.8.8,8.8.4.4"
     
     # Set search domain
-    nmcli con mod gpu-cluster ipv4.dns-search "hpc.ttu.edu"
+    nmcli con mod gpu ipv4.dns-search "hpc.ttu.edu"
     
     info "DNS configuration completed"
 }

@@ -4,6 +4,9 @@
 source "$(dirname "$0")/../../lib/functions.sh"
 source "$(dirname "$0")/../../lib/config.sh"
 
+# Load network configuration
+load_component_config "network"
+
 # Configure network interface using NetworkManager (HEAD NODE)
 configure_network() {
     info "Configuring HEAD NODE network interface $HEAD_NETWORK_INTERFACE using NetworkManager..."
