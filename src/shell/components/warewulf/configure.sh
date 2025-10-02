@@ -8,6 +8,15 @@ source "$(dirname "$0")/../../lib/config.sh"
 load_component_config "network"
 export_config
 
+# Load compute node definitions if present
+NODES_DEF_FILE="$(dirname "$0")/nodes.conf"
+if [ -f "$NODES_DEF_FILE" ]; then
+    info "Loading compute node definitions from $NODES_DEF_FILE"
+    source "$NODES_DEF_FILE"
+else
+    warn "nodes.conf not found; compute node operations will be skipped unless arrays are set elsewhere"
+fi
+
 # Update Warewulf configuration (post-installation)
 update_warewulf_config() {
     info "Updating Warewulf configuration..."
@@ -60,6 +69,12 @@ update_vnfs() {
 configure_compute_nodes() {
     info "Configuring compute nodes..."
     
+    # Guard: skip if arrays are undefined or empty
+    if [ ${#COMPUTE_NODES[@]:-0} -eq 0 ] || [ ${#COMPUTE_NODE_IPS[@]:-0} -eq 0 ]; then
+        warn "No compute nodes defined; skipping compute node configuration"
+        return 0
+    fi
+
     for i in "${!COMPUTE_NODES[@]}"; do
         local node="${COMPUTE_NODES[$i]}"
         local ip="${COMPUTE_NODE_IPS[$i]}"

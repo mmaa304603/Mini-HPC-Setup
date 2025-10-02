@@ -57,6 +57,7 @@ src/shell/
 │   └── apptainer.conf     # Apptainer container settings
 │
 ├── components/            # 🏗️ Service Installers
+│   ├── base/              # Base OS prerequisites (Rocky & Jetson)
 │   ├── warewulf/          # Bare-metal provisioning system
 │   ├── slurm/             # Workload manager and scheduler
 │   ├── spack/             # Package manager for HPC software
@@ -105,18 +106,21 @@ cd src/shell
 vim config/network.conf
 vim config/slurm.conf
 
-# 2. Install all components (orchestrated setup)
+# 2. Prepare base OS (Rocky headnode or Jetson)
+./components/base/install.sh        # OS updates + essential tools
+
+# 3. Install all components (orchestrated setup)
 ./bin/hpc-setup --step all          # Install all components with checkpointing
 
-# OR install components individually:
+# OR install components individually
 ./bin/hpc-setup --step slurm        # Install only SLURM
 ./bin/hpc-setup --step spack        # Install only Spack
 ./bin/hpc-setup --step monitoring   # Install monitoring stack
 
-# 3. Verify installation
+# 4. Verify installation
 ./bin/hpc-test --all
 
-# 4. Start daily operations
+# 5. Start daily operations
 ./maintenance/maintenance_daily.sh
 ```
 
@@ -194,6 +198,7 @@ install_package "slurm" || {
 ### 🏗️ Service Installers (`components/`)
 Each component provides self-contained installation and configuration:
 
+- **`base/`** - Base OS prerequisites (updates, common tools, firewall tooling)
 - **`warewulf/`** - Bare-metal provisioning system for managing compute nodes
 - **`slurm/`** - Job scheduler and workload manager for HPC workloads  
 - **`spack/`** - Package manager for scientific software installation

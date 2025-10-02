@@ -6,23 +6,8 @@
 # Source common functions
 source "$(dirname "$0")/functions.sh"
 
-# Configuration directory
+# Configuration directory (legacy support only; centralized configs removed)
 CONFIG_DIR="$(dirname "$(dirname "$0")")/config"
-
-# Load configuration file (legacy - from old centralized config)
-load_config() {
-    local config_file="$1"
-    local full_path="$CONFIG_DIR/$config_file"
-    
-    if [ ! -f "$full_path" ]; then
-        error "Configuration file not found: $full_path"
-        return 1
-    fi
-    
-    info "Loading configuration from $full_path"
-    source "$full_path"
-    return 0
-}
 
 # Load component-specific configuration
 load_component_config() {
@@ -50,6 +35,12 @@ load_all_configs() {
         source "$base_dir/components/network/network.conf"
     fi
     
+    # Load warewulf configuration
+    if [ -f "$base_dir/components/warewulf/warewulf.conf" ]; then
+        info "Loading warewulf configuration"
+        source "$base_dir/components/warewulf/warewulf.conf"
+    fi
+    
     # Load slurm configuration
     if [ -f "$base_dir/components/slurm/slurm.conf" ]; then
         info "Loading slurm configuration"
@@ -72,12 +63,6 @@ load_all_configs() {
     if [ -f "$base_dir/components/apptainer/apptainer.conf" ]; then
         info "Loading apptainer configuration"
         source "$base_dir/components/apptainer/apptainer.conf"
-    fi
-    
-    # Load Warewulf configuration from the Warewulf directory
-    if [ -f "$base_dir/components/warewulf/warewulf.conf" ]; then
-        info "Loading Warewulf configuration"
-        # We don't source this file directly as it's in YAML format
     fi
 }
 

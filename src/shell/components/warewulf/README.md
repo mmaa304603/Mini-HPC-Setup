@@ -6,6 +6,24 @@ This directory contains the Warewulf provisioning system implementation for the 
 
 Warewulf is a modern, scalable system provisioning tool that enables stateless computing for HPC clusters. It manages compute nodes through network booting, container-based provisioning, and centralized configuration management.
 
+## Architecture
+
+Unlike other components that require role-specific installation (like SLURM), Warewulf follows a **centralized management model**:
+
+- **Head Node Only**: Warewulf is installed and runs exclusively on the head node
+- **Stateless Compute Nodes**: Compute nodes boot from VNFS (Virtual Node File System) images
+- **No Local Installation**: Compute nodes don't require local Warewulf installation
+- **Centralized Configuration**: All node management happens from the head node
+
+### Why No Role Splitting Needed
+
+| Aspect | SLURM Component | Warewulf Component |
+|--------|----------------|-------------------|
+| **Installation** | Role-specific (head/gpu/cpu) | Head node only |
+| **Compute Nodes** | Local installation required | Stateless (VNFS boot) |
+| **Configuration** | Per-node configuration | Centralized management |
+| **Splitting Strategy** | ✅ Split by role | ❌ Single management point |
+
 ## Files and Scripts
 
 ### Scripts
@@ -73,14 +91,28 @@ warewulf:
 
 ## Workflow
 
-### 1. Initial Setup
-```bash
-# Install Warewulf
-./install.sh
+### Two-Phase Process
 
-# Configure Warewulf
+Unlike SLURM which requires separate installation on each node type, Warewulf follows a simpler two-phase approach:
+
+#### Phase 1: Head Node Installation (One-time)
+```bash
+# Install Warewulf on head node only
+./install.sh
+```
+
+#### Phase 2: VNFS Configuration (Ongoing)
+```bash
+# Configure VNFS images and compute nodes
 ./configure.sh
 ```
+
+### Compute Node Lifecycle
+
+- **No Local Installation**: Compute nodes don't need Warewulf installed locally
+- **Network Boot**: Nodes boot from VNFS images over the network
+- **Stateless Operation**: All configuration managed centrally from head node
+- **Easy Management**: Add/remove/update nodes through head node configuration
 
 ### 2. Adding Compute Nodes
 ```bash

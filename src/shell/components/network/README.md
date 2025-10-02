@@ -36,15 +36,15 @@ nmcli con add type ethernet ifname enp2s0 con-name cluster-internal \
 - Acts as **gateway** for internal cluster subnet (10.0.0.0/22)
 - Covers the range: 10.0.0.1 → 10.0.2.4 (all nodes)
 
-### GPU Node Connection (`gpu-cluster`)
+### GPU Node Connection (`gpu`)
 ```bash
-nmcli con add type ethernet ifname eth0 con-name gpu-cluster \
+nmcli con add type ethernet ifname eth0 con-name gpu \
   ip4 10.0.2.4/22 \
   gw4 10.0.0.1 \
   connection.autoconnect yes
 ```
 
-**Why "gpu-cluster":**
+**Why "gpu":**
 - **Client connection** to the cluster
 - Connects **to** the cluster, not managing it
 - Acts as **compute node** that uses cluster services
