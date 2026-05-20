@@ -4,7 +4,7 @@
 # This script loads configuration from the config directory
 
 # Source common functions
-source "$(dirname "$0")/functions.sh"
+source "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/functions.sh"
 
 # Configuration directory (legacy support only; centralized configs removed)
 CONFIG_DIR="$(dirname "$(dirname "$0")")/config"

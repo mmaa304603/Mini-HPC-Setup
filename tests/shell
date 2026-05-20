@@ -16,7 +16,8 @@ nslookup ttu.edu
 
 # Check network connectivity
 echo "Checking network connectivity..."
-ping -c 4 8.8.8.8
+# ping -c 4 8.8.8.8  # ping can be clocked
+curl -fsI https://google.com >/dev/null && echo "Internet OK" || echo "Internet check faied"
 
 # Check firewall status
 echo "Checking firewall status..."
@@ -28,7 +29,7 @@ systemctl status dhcpd
 
 # Check TFTP server
 echo "Checking TFTP server..."
-systemctl status tftpd
+systemctl status tftp
 
 # Check NFS server
 echo "Checking NFS server..."
@@ -47,5 +48,5 @@ netstat -tuln
 echo "Checking network logs..."
 journalctl -u NetworkManager
 journalctl -u dhcpd
-journalctl -u tftpd
+journalctl -u tftp
 journalctl -u nfs-server 

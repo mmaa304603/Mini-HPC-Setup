@@ -8,8 +8,8 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 SHELL_DIR="$(dirname "$SCRIPT_DIR")"
 source "${SHELL_DIR}/lib/functions.sh"
 source "${SHELL_DIR}/lib/config.sh"
-source "${SHELL_DIR}/common/utils/validate.sh"
-source "${SHELL_DIR}/common/utils/checkpoint.sh"
+source "${SHELL_DIR}/lib/validate.sh"
+source "${SHELL_DIR}/lib/checkpoint.sh"
 
 # Function to create log directory
 setup_logging() {
