@@ -1,14 +1,19 @@
 #!/bin/bash
+set -euo pipefail
 
 # Source common functions and configuration
-source "$(dirname "$0")/../common/functions.sh"
-source "$(dirname "$0")/../common/config.sh"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+source "${SCRIPT_DIR}/../../../lib/functions.sh"
+source "${SCRIPT_DIR}/../../../lib/config.sh"
+source "${SCRIPT_DIR}/../spack.conf"
 
 # Install Spack
 install_spack() {
     info "Installing Spack..."
-    
+
     # Clone Spack repository
+    rm -rf "$SPACK_ROOT"
     git clone https://github.com/spack/spack.git "$SPACK_ROOT"
     
     # Set up environment
@@ -19,21 +24,33 @@ EOF
     
     source "$SPACK_ENV_FILE"
     
+    # Minimal compiler/build dependencies
+    dnf -y install \
+        gcc gcc-c++ gcc-gfortran \
+        make patch tar gzip bzip2 xz unzip \
+        findutils git which file
+    
+    # Register system compiler with Spack
+    spack compiler find
+    spack compilers
+    
     info "Spack installed successfully"
 }
 
 # Install common packages
 install_packages() {
     info "Installing common packages..."
-    
+
     # Install packages from configuration
     for package in "${PACKAGES[@]}"; do
         info "Installing package: $package"
-        spack install "$package" || {
+        if spack install "$package"; then info "Installed package: $package"
+        else 
             warn "Failed to install package: $package"
-        }
+            failed=1
+        fi
     done
-    
+
     info "Common packages installed successfully"
 }
 

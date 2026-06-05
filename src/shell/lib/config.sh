@@ -3,16 +3,18 @@
 # Configuration loader script
 # This script loads configuration from the config directory
 
-# Source common functions
-source "$(dirname "$0")/functions.sh"
-
 # Configuration directory (legacy support only; centralized configs removed)
-CONFIG_DIR="$(dirname "$(dirname "$0")")/config"
+LIB_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+SHELL_DIR="$(dirname "$LIB_DIR")"
+CONFIG_DIR="${SHELL_DIR}/config"
+
+source "${LIB_DIR}/functions.sh" # Source common functions
+source "${CONFIG_DIR}/config.conf"
 
 # Load component-specific configuration
 load_component_config() {
     local component="$1"
-    local base_dir="$(dirname "$(dirname "$0")")"
+    local base_dir="$SHELL_DIR"
     local config_file="$base_dir/components/$component/$component.conf"
     
     if [ ! -f "$config_file" ]; then
@@ -27,8 +29,7 @@ load_component_config() {
 
 # Load all configuration files from component directories
 load_all_configs() {
-    local base_dir="$(dirname "$(dirname "$0")")"
-    
+    local base_dir="$SHELL_DIR"
     # Load network configuration
     if [ -f "$base_dir/components/network/network.conf" ]; then
         info "Loading network configuration"

@@ -20,10 +20,18 @@ install_munge() {
     
     # Install MUNGE packages
     dnf install -y munge munge-libs
-    
-    # Generate munge key
-    info "Generating MUNGE key..."
-    /usr/sbin/create-munge-key
+
+    # Check if MUNGE key already exists and generate one if none exists
+    info "Checking MUNGE key..."
+    if [ ! -f /etc/munge/munge.key ]; then
+        info "Generating MUNGE key..."
+        /usr/sbin/create-munge-key
+    else
+        info "MUNGE key already exists; skipping generation"
+    fi
+
+    # chown munge:munge /etc/munge/munge.key
+    # chmod 400 /etc/munge/munge.key
     
     # Enable and start MUNGE service
     info "Starting MUNGE service..."
@@ -49,7 +57,7 @@ install_slurm() {
     dnf install -y epel-release
     
     # Install SLURM packages
-    dnf install -y slurm slurmctld slurm-devel
+    dnf install -y slurm slurm-slurmctld slurm-devel
     
     info "SLURM controller installed successfully"
 }
@@ -58,15 +66,30 @@ install_slurm() {
 configure_slurm() {
     info "Configuring SLURM controller..."
     
+     # Ensure slurm user/group exists
+    if ! getent group slurm >/dev/null; then
+        groupadd --system slurm
+    fi
+
+    if ! id slurm >/dev/null 2>&1; then
+        useradd --system \
+            --gid slurm \
+            --home-dir /var/lib/slurm \
+            --shell /sbin/nologin \
+            slurm
+    fi
+
     # Create SLURM directories
-    mkdir -p /etc/slurm /var/log/slurm /var/spool/slurm/state
+    mkdir -p /etc/slurm /var/log/slurm /var/spool/slurm/state /var/lib/slurm
     chown -R slurm:slurm /var/log/slurm /var/spool/slurm || true
     
     # Enable SLURM controller
-    systemctl enable --now slurmctld || warn "slurmctld enable/start failed (may require config first)"
+    systemctl enable slurmctld || warn "slurmctld enable failed (may require config first)"
+    systemctl start slurmctld || warn "slurmctld start failed (may require config first)"
     
     info "SLURM controller configuration completed"
-    info "Use ./configure.sh to generate slurm.conf and deploy"
+    info "Running SLURM configuration file..."
+    bash "$(dirname "$0")/configure.sh"
 }
 
 main() {

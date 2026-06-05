@@ -14,18 +14,31 @@ export_config
 
 check_root
 
+IMAGE_NAME="rockylinux-9.6"
+
+# halt pre-running image commands if exists
+rm -rf /var/lib/warewulf/chroots/rockylinux-9.6/run
+
 # Install MUNGE in Warewulf image
 install_munge() {
-    info "Installing MUNGE in Warewulf CPU image..."
-    
-    # Install MUNGE packages in the image
-    wwctl exec --all "dnf install -y munge munge-libs"
-    
-    # Set proper ownership and permissions in the image
-    wwctl exec --all "chown -R munge: /etc/munge /var/lib/munge /var/log/munge /var/run/munge"
-    wwctl exec --all "chmod 0700 /etc/munge /var/lib/munge"
-    wwctl exec --all "chmod 0755 /var/log/munge /var/run/munge"
-    
+    info "Installing MUNGE in Warewulf CPU image of ${IMAGE_NAME}"
+
+    wwctl image exec "$IMAGE_NAME" -- /bin/bash -lc '
+        set -e
+        export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+        
+        # Install MUNGE packages in the image
+        dnf -y install munge munge-libs
+        
+        mkdir -p /var/run/munge
+
+        # Set proper ownership and permissions in the image
+        chown -R munge:munge /etc/munge /var/lib/munge /var/log/munge /var/run/munge
+        chmod 0700 /etc/munge /var/lib/munge
+        chmod 0755 /var/log/munge /var/run/munge
+
+        echo "MUNGE installed in Warewulf image successfully inside image"
+    '
     info "MUNGE installed in Warewulf image successfully"
 }
 
@@ -34,7 +47,13 @@ install_slurm() {
     info "Installing SLURM client in Warewulf CPU image..."
     
     # Install SLURM packages in the image
-    wwctl exec --all "dnf install -y slurm-wlm slurmd slurm-client"
+    wwctl image exec "$IMAGE_NAME" -- /bin/bash -lc '
+        set -e
+        export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+        dnf -y install slurm slurm-slurmd
+        # dnf -y install slurm-wlm slurmd slurm-client
+    '
     
     info "SLURM client installed in Warewulf image successfully"
 }
@@ -44,11 +63,17 @@ configure_slurm() {
     info "Configuring SLURM client in Warewulf CPU image..."
     
     # Create SLURM directories in the image
-    wwctl exec --all "mkdir -p /var/log/slurm /var/spool/slurm"
-    
-    # Enable SLURM compute daemon in the image
-    wwctl exec --all "systemctl enable slurmd"
-    
+    wwctl image exec "$IMAGE_NAME" -- /bin/bash -lc '
+        set -e
+        export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+        
+        # Create SLURM directories in the image
+        mkdir -p /var/log/slurm /var/spool/slurm
+        
+        # Enable SLURM compute daemon in the image
+        systemctl enable slurmd
+    '
+
     info "SLURM client configuration completed in Warewulf image"
 }
 
@@ -58,10 +83,18 @@ copy_munge_key() {
     
     # Copy MUNGE key from head node to the image
     if [ -f "/etc/munge/munge.key" ]; then
-        wwctl exec --all "mkdir -p /etc/munge"
-        wwctl exec --all "cp /etc/munge/munge.key /etc/munge/munge.key"
-        wwctl exec --all "chown munge: /etc/munge/munge.key"
-        wwctl exec --all "chmod 0400 /etc/munge/munge.key"
+        wwctl image exec \
+            --bind /etc/munge/munge.key:/tmp/munge.key:ro \
+            "$IMAGE_NAME" -- /bin/bash -lc '
+                set -e
+                export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+                mkdir -p /etc/munge
+                cp /tmp/munge.key /etc/munge/munge.key
+                chown munge:munge /etc/munge/munge.key
+                chmod 0400 /etc/munge/munge.key
+            '
+
         info "MUNGE key copied to Warewulf image successfully"
     else
         error "MUNGE key not found at /etc/munge/munge.key"

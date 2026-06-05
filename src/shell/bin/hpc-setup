@@ -8,8 +8,8 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 SHELL_DIR="$(dirname "$SCRIPT_DIR")"
 source "${SHELL_DIR}/lib/functions.sh"
 source "${SHELL_DIR}/lib/config.sh"
-source "${SHELL_DIR}/common/utils/validate.sh"
-source "${SHELL_DIR}/common/utils/checkpoint.sh"
+source "${SHELL_DIR}/lib/validate.sh"
+source "${SHELL_DIR}/lib/checkpoint.sh"
 
 # Function to create log directory
 setup_logging() {
@@ -41,7 +41,7 @@ run_installations() {
     if [ "${WAREWULF_ENABLED}" = true ]; then
         if ! verify_checkpoint "warewulf_setup"; then
             log_info "Running Warewulf setup..."
-            if ! "${SCRIPT_DIR}/warewulf/install.sh"; then
+            if ! "${SHELL_DIR}/components/warewulf/install.sh"; then
                 log_error "Warewulf setup failed"
                 failed=1
             else
@@ -56,7 +56,7 @@ run_installations() {
     if [ "${SLURM_ENABLED}" = true ]; then
         if ! verify_checkpoint "slurm_setup"; then
             log_info "Running SLURM setup..."
-            if ! "${SHELL_DIR}/components/slurm/install.sh"; then
+            if ! bash "${SHELL_DIR}/components/slurm/install.sh"; then
                 log_error "SLURM setup failed"
                 failed=1
             else
@@ -71,7 +71,7 @@ run_installations() {
     if [ "${SPACK_ENABLED}" = true ]; then
         if ! verify_checkpoint "spack_setup"; then
             log_info "Running Spack setup..."
-            if ! "${SHELL_DIR}/components/spack/install.sh"; then
+            if ! bash "${SHELL_DIR}/components/spack/install/install.sh"; then
                 log_error "Spack setup failed"
                 failed=1
             else
@@ -174,6 +174,7 @@ handle_args() {
     
     # Default to installing all components
     NETWORK_SETUP_ENABLED=true
+    WAREWULF_ENABLED=true
     SLURM_ENABLED=true
     SPACK_ENABLED=true
     MONITORING_ENABLED=true

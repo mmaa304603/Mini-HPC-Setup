@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Source common utilities
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 source "${SCRIPT_DIR}/logging.sh"
 
 # Checkpoint directory

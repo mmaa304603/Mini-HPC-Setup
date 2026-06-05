@@ -43,8 +43,11 @@ configure_routing() {
     info "IP forwarding enabled"
     
     # Configure firewall zones and masquerading
-    EXTERNAL_IF="enp0s21f0u6c2"   # Internet-facing NIC
-    INTERNAL_IF="enp2s0"           # Cluster-facing NIC
+    # EXTERNAL_IF="enp0s21f0u6c2"   # Internet-facing NIC
+    EXTERNAL_IF="enp0s3"   # Internet-facing NIC - Change network interface due to hardware constraints while testing
+    
+    # INTERNAL_IF="enp2s0"           # Cluster-facing NIC
+    INTERNAL_IF="enp0s8"           # Cluster-facing NIC - Change network interface due to hardware constraints while testing
     
     # Set up firewall zones
     firewall-cmd --permanent --zone=public --add-interface="$EXTERNAL_IF"

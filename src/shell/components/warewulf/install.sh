@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Source common functions and configuration
-source "$(dirname "$0")/../../lib/functions.sh"
-source "$(dirname "$0")/../../lib/config.sh"
+source "$(dirname "$0")/../../lib/functions.sh" || exit 1
+source "$(dirname "$0")/../../lib/config.sh" || exit 1  
 
 # Load network configuration for IP-related values
 load_component_config "network"
@@ -111,11 +111,12 @@ main() {
     configure_system_services
     
     info "Warewulf installation completed successfully"
-    info "Next steps:"
-    info "1. Run configuration: ./configure.sh"
-    info "2. Add nodes: wwctl node add <nodename> --ipaddr=<ip> --discoverable=true"
-    info "3. Build overlays: wwctl overlay build"
-    info "4. Boot your compute nodes!"
+
+    # Run configuration
+    source "$(dirname "$0")/configure.sh"
+
+    sudo wwctl overlay build
+    info "Now boot your compute nodes!"
 }
 
 main "$@" 

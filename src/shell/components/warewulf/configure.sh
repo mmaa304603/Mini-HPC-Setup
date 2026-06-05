@@ -65,12 +65,33 @@ update_vnfs() {
     info "VNFS image update completed"
 }
 
+# Remove existing compute nodes defined in nodes.conf
+remove_existing_nodes() {
+    info "Removing existing configured compute nodes..."
+
+    for node in "${COMPUTE_NODES[@]}"; do
+        if wwctl node list "$node" >/dev/null 2>&1; then
+            info "Deleting existing node $node..."
+            wwctl node delete "$node" -y || {
+                error "Failed to delete existing node $node"
+                return 1
+            }
+        fi
+    done
+}
+
 # Configure compute nodes
 configure_compute_nodes() {
     info "Configuring compute nodes..."
+        
+    # Remove expsting nodes to prevent confusion
+    remove_existing_nodes || {
+        error "Failed to remove existing compute nodes"
+        return 1
+    }
     
     # Guard: skip if arrays are undefined or empty
-    if [ ${#COMPUTE_NODES[@]:-0} -eq 0 ] || [ ${#COMPUTE_NODE_IPS[@]:-0} -eq 0 ]; then
+    if [ "${#COMPUTE_NODES[@]}" -eq 0 ] || [ "${#COMPUTE_NODE_IPS[@]}" -eq 0 ]; then
         warn "No compute nodes defined; skipping compute node configuration"
         return 0
     fi
@@ -82,13 +103,13 @@ configure_compute_nodes() {
         info "Configuring node $node ($ip)..."
         
         # Add node to Warewulf
-        wwctl node add "$node" --ipaddr "$ip" || {
+        wwctl node add "$node" --ipaddr "$ip" --discoverable=true || {
             error "Failed to add node $node"
             continue
         }
         
         # Set node profile
-        wwctl node set "$node" --profile default || {
+        wwctl node set "$node" --profile default -y || {
             error "Failed to set profile for node $node"
             continue
         }
@@ -98,6 +119,9 @@ configure_compute_nodes() {
             error "Failed to configure node $node"
             continue
         }
+
+        wwctl profile set default --image rockylinux-9.6 -y
+
     done
 }
 
@@ -110,15 +134,11 @@ main() {
     
     # Update VNFS image
     update_vnfs
-    
+
     # Configure compute nodes
     configure_compute_nodes
     
     info "Warewulf configuration completed successfully"
-    info "Next steps:"
-    info "1. Add nodes: wwctl node add <nodename> --ipaddr=<ip> --discoverable=true"
-    info "2. Build overlays: wwctl overlay build"
-    info "3. Boot your compute nodes!"
 }
 
 main "$@" 

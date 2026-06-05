@@ -93,8 +93,8 @@ start_slurm_services() {
     # Start slurmctld on head node
     start_service "slurmctld"
     
-    # Start slurmd on all nodes
-    start_service "slurmd"
+    # Start slurmd on all nodes -> start slurmd only on cpu nodes
+    # start_service "slurmd"
 }
 
 # Main execution
