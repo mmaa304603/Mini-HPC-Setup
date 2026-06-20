@@ -45,6 +45,23 @@ if [ -f "$REPO_ROOT/.spack/config.yaml" ]; then
     echo -e "${GREEN}✓${NC} Copied config.yaml"
 else
     echo -e "${YELLOW}Warning: config.yaml not found in repository${NC}"
+    echo -e "${BLUE}Creating generated default config.yaml${NC}"
+    cat > "$SPACK_CONFIG_DIR/config.yaml" << EOF
+config:
+  install_tree:
+    root: $SPACK_INSTALL_DIR/opt/spack
+    projections:
+      all: '{name}/{version}-{compiler.name}-{compiler.version}/{hash}'
+  build_stage:
+    - /tmp/spack-stage
+  source_cache: $SPACK_INSTALL_DIR/sources
+  misc_cache: $SPACK_INSTALL_DIR/cache
+  module_roots:
+    tcl: $SPACK_INSTALL_DIR/modules/tcl
+    lmod: $SPACK_INSTALL_DIR/modules/lmod
+  build_language: C
+  build_jobs: 8
+EOF
 fi
 
 # Copy compilers.yaml
@@ -73,8 +90,10 @@ fi
 
 # Set proper permissions
 echo -e "${BLUE}Setting permissions...${NC}"
-chmod 644 "$SPACK_CONFIG_DIR"/*.yaml
-chown root:root "$SPACK_CONFIG_DIR"/*.yaml
+if compgen -G "$SPACK_CONFIG_DIR/*.yaml" >/dev/null; then
+    chmod 644 "$SPACK_CONFIG_DIR"/*.yaml
+    chown root:root "$SPACK_CONFIG_DIR"/*.yaml
+fi
 
 # Create system-wide environment file
 echo -e "${BLUE}Creating system-wide environment file...${NC}"
@@ -82,6 +101,9 @@ cat > "/etc/profile.d/spack.sh" << EOF
 # Spack environment setup
 export SPACK_ROOT=$SPACK_INSTALL_DIR
 export PATH=\$SPACK_ROOT/bin:\$PATH
+if [ -f "\$SPACK_ROOT/share/spack/setup-env.sh" ]; then
+    . "\$SPACK_ROOT/share/spack/setup-env.sh"
+fi
 EOF
 
 chmod 644 "/etc/profile.d/spack.sh"
@@ -98,4 +120,4 @@ echo -e "└── modules.yaml"
 echo -e "\nEnvironment file created at /etc/profile.d/spack.sh"
 echo -e "\nTo apply the changes, users need to either:"
 echo -e "1. Log out and log back in"
-echo -e "2. Run: source /etc/profile.d/spack.sh" 
+echo -e "2. Run: source /etc/profile.d/spack.sh"

@@ -1,7 +1,14 @@
 #!/bin/bash
+set -euo pipefail
 
 # Source common functions
-source "$(dirname "$0")/../common/functions.sh"
+# source "$(dirname "$0")/../common/functions.sh"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+source "${SCRIPT_DIR}/../../lib/functions.sh"
+source "${SCRIPT_DIR}/../../lib/config.sh"
+
+load_component_config "apptainer" 2>/dev/null || true
 
 # Check if running as root
 check_root
@@ -198,7 +205,7 @@ From: rockylinux:9
     export MANPATH=\$OMPI_DIR/share/man:\$MANPATH
 
 %runscript
-    echo "Container with OpenMPI ${OMPI_VERSION}"
+    echo "Container with OpenMPI (OMPI_VERSION: - version unidentified)"
     /usr/bin/mpirun --version
 EOF
     
@@ -217,7 +224,7 @@ From: nvidia/cuda:12.0.0-devel-rockylinux9
     export LD_LIBRARY_PATH=/usr/local/cuda/lib64:\$LD_LIBRARY_PATH
 
 %runscript
-    echo "Container with CUDA ${CUDA_VERSION}"
+    echo "Container with CUDA (CUDA_VERSION - version unidentified"
     nvidia-smi
 EOF
     

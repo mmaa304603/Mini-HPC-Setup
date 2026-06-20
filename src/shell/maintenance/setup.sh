@@ -1,11 +1,13 @@
 #!/bin/bash
+set -euo pipefail
 
 # Source library scripts
 source "$(dirname "$0")/../lib/functions.sh"
 source "$(dirname "$0")/../lib/config.sh"
 
 # Load configuration
-load_config "monitoring.conf"
+source "$(dirname "$0")/../components/grafana/monitoring.conf"
+
 export_config
 
 # Install Elasticsearch
@@ -40,7 +42,23 @@ node.name: $ELASTICSEARCH_NODE_NAME
 network.host: $ELASTICSEARCH_HOST
 http.port: $ELASTICSEARCH_PORT
 discovery.type: single-node
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
 EOF
+
+    echo "Allowing elasticsearch user to create the keystore, locking config dir back down"
+    chown root:elasticsearch /etc/elasticsearch
+    chmod 2750 /etc/elasticsearch
+
+    if [ ! -f /etc/elasticsearch/elasticsearch.keystore ]; then
+        chmod g+w /etc/elasticsearch
+        runuser -u elasticsearch -- /usr/share/elasticsearch/bin/elasticsearch-keystore create
+        chmod g-w /etc/elasticsearch
+    fi
+
+    echo "Double checking permissions"
+    chown root:elasticsearch /etc/elasticsearch/elasticsearch.keystore
+    chmod 660 /etc/elasticsearch/elasticsearch.keystore
     
     # Start and enable Elasticsearch
     systemctl enable --now elasticsearch
