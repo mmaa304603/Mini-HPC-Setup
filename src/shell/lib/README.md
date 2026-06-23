@@ -24,7 +24,7 @@ source "$(dirname "$0")/../../lib/functions.sh"
 source "$(dirname "$0")/../../lib/config.sh"
 
 # Load configuration
-load_config "network.conf"
+load_component_config "network"
 export_config
 
 # Use functions
@@ -78,7 +78,7 @@ remote_exec "node1" "ls -la"  # Execute command on remote node
 ### Loading Configuration
 ```bash
 # Load specific config file
-load_config "network.conf"
+load_component_config "network"
 
 # Load all standard configs
 load_all_configs
@@ -92,13 +92,13 @@ export_config
 - `slurm.conf` - SLURM cluster configuration
 - `spack.conf` - Spack package manager settings
 - `monitoring.conf` - ELK/Grafana/Prometheus settings
-- `squid.conf` - Squid proxy configuration
+- `squid.conf` - Squid proxy configuration, not used anymore
 - `apptainer.conf` - Apptainer container settings
 
 ### Configuration Variables
 After loading, variables are available:
 ```bash
-load_config "network.conf"
+load_component_config "network"
 echo "Head node IP: $HEAD_NODE_IP"
 echo "Network: $NETWORK"
 echo "DHCP range: $DHCP_START - $DHCP_END"
@@ -139,7 +139,7 @@ source "$(dirname "$0")/../../lib/config.sh"
 
 main() {
     check_root
-    load_config "network.conf"
+    load_component_config "network"
     
     info "Installing component..."
     install_package "my-package"
@@ -164,8 +164,8 @@ source "$(dirname "$0")/../../lib/functions.sh"
 source "$(dirname "$0")/../../lib/config.sh"
 
 main() {
-    load_config "network.conf"
-    load_config "slurm.conf"
+    load_component_config "network"
+    load_component_config "slurm"
     export_config
     
     info "Configuring with network: $NETWORK"

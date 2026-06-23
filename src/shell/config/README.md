@@ -6,7 +6,12 @@ User-editable configuration consumed by scripts in `src/shell/components/` and `
 
 Top-level `.conf` files (key=value) loaded via `lib/config.sh`:
 
-- `network.conf`, `slurm.conf`, `spack.conf`, `monitoring.conf`, `squid.conf`, `apptainer.conf`
+- `config.conf` - shared paths and feature flags
+
+Component-specific configuration lives with each component, for example
+`components/network/network.conf`, `components/slurm/slurm.conf`,
+`components/spack/spack.conf`, `components/grafana/monitoring.conf`, and
+`components/apptainer/apptainer.conf`.
 
 ## Loading configuration in scripts
 
@@ -15,8 +20,8 @@ source "$(dirname "$0")/../lib/functions.sh"
 source "$(dirname "$0")/../lib/config.sh"
 
 # Load what you need
-load_config "network.conf"
-load_config "slurm.conf"
+load_component_config "network"
+load_component_config "slurm"
 
 # Make variables available to child processes
 export_config

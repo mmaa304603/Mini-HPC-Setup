@@ -64,10 +64,7 @@ load_component_config "slurm"
 ./components/slurm/install.sh
 
 # Configure a component
-./components/slurm/config.sh
-
-# Manage a component
-./components/slurm/manage.sh
+./components/slurm/configure.sh
 ```
 
 ## Dependencies

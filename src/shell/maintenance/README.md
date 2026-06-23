@@ -61,7 +61,7 @@ This directory contains scripts for maintaining and monitoring the HPC cluster.
 
 ## Configuration
 
-Scripts use configuration from `src/shell/config/monitoring.conf` for:
+Scripts use monitoring configuration from `src/shell/components/grafana/monitoring.conf` for:
 - Service enablement flags
 - Backup locations and retention
 - Security scan parameters
@@ -71,7 +71,7 @@ Scripts use configuration from `src/shell/config/monitoring.conf` for:
 
 - Library functions from `src/shell/lib/functions.sh`
 - Configuration loading from `src/shell/lib/config.sh`
-- Monitoring configuration from `src/shell/config/monitoring.conf`
+- Monitoring configuration from `src/shell/components/grafana/monitoring.conf`
 
 ## Support
 

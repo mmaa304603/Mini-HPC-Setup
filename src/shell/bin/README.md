@@ -13,7 +13,6 @@ Entry points and helper scripts for shell-based operations.
 - `deploy.sh`: deploy built artifacts
 - `cleanup.sh`: clean build and temp outputs
 - `setup-dev-env.sh`: local dev environment setup
-- `core/`, `setup/`, `tools/`: helper subcommands/utilities
 
 ## Usage
 
@@ -22,7 +21,7 @@ Entry points and helper scripts for shell-based operations.
 ./hpc-manage --help
 
 # Example: run validations
-./hpc-test --all
+./hpc-test run all
 
 # Build and deploy
 ./build.sh && ./deploy.sh
