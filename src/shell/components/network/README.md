@@ -209,7 +209,7 @@ echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
 
 ## Configuration
 
-The scripts use configuration from `src/shell/config/network.conf` with clearly separated sections:
+The scripts use configuration from `src/shell/components/network/network.conf` with clearly separated sections:
 
 ### Head Node Variables
 - `HEAD_NODE_IP` - Head node IP address (e.g., 10.0.0.1)
