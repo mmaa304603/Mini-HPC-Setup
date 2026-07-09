@@ -17,6 +17,20 @@ else
     warn "nodes.conf not found; compute node operations will be skipped unless arrays are set elsewhere"
 fi
 
+regenerate_dhcp_config() {
+    info "Regenerating DHCP configuration from Warewulf..."
+
+    wwctl configure dhcp || {
+        error "Failed to regenerate DHCP configuration"
+        return 1
+    }
+
+    systemctl restart dhcpd || {
+        error "Failed to restart DHCP service"
+        return 1
+    }
+}
+
 # Update Warewulf configuration (post-installation)
 update_warewulf_config() {
     info "Updating Warewulf configuration..."
@@ -33,7 +47,8 @@ update_warewulf_config() {
     sed -i "s/network: 10.0.0.0/network: ${NETWORK}/" /etc/warewulf/warewulf.conf
     sed -i "s/range start: 10.0.1.1/range start: ${DHCP_START}/" /etc/warewulf/warewulf.conf
     sed -i "s/range end: 10.0.1.255/range end: ${DHCP_END}/" /etc/warewulf/warewulf.conf
-    
+    regenerate_dhcp_config || return 1
+
     # Restart Warewulf service
     systemctl restart warewulfd || {
         error "Failed to restart Warewulf service"
@@ -96,6 +111,10 @@ configure_compute_nodes() {
         return 0
     fi
 
+    if [ "${#COMPUTE_NODE_HWADDRS[@]}" -eq 0 ]; then
+        warn "No COMPUTE_NODE_HWADDRS defined; DHCP leases will stay within the configured pool, but physical node-to-IP order is not guaranteed"
+    fi
+
     for i in "${!COMPUTE_NODES[@]}"; do
         local node="${COMPUTE_NODES[$i]}"
         local ip="${COMPUTE_NODE_IPS[$i]}"
@@ -123,6 +142,8 @@ configure_compute_nodes() {
         wwctl profile set default --image rockylinux-9.6 -y
 
     done
+
+    regenerate_dhcp_config || return 1
 }
 
 # Main execution
@@ -141,4 +162,4 @@ main() {
     info "Warewulf configuration completed successfully"
 }
 
-main "$@" 
+main "$@"
