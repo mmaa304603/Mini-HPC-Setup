@@ -14,8 +14,7 @@ install_spack() {
     info "Cloning Spack repository ..." 
 
     if [ -x "$SPACK_ROOT/bin/spack" ] && [ -f "$SPACK_ROOT/share/spack/setup-env.sh" ]; then
-        info "Existing Spack installation found at $SPACK_ROOT; skipping clone and resetting repository..."
-        spack uninstall -ay
+        info "Existing Spack installation found at $SPACK_ROOT; skipping clone"
     else        
         warn "$SPACK_ROOT partially installed or not installed at all, cloning again..."
         rm -rf "$SPACK_ROOT"
@@ -25,17 +24,14 @@ install_spack() {
     # Set up environment
 cat > "$SPACK_ENV_FILE" << EOF
 export SPACK_ROOT=$SPACK_ROOT
+export SPACK_SYSTEM_CONFIG_PATH=/etc/spack
+export SPACK_USER_CONFIG_PATH=/etc/spack/no-user-config
+unset SPACK_DISABLE_LOCAL_CONFIG
 export PATH=\$SPACK_ROOT/bin:\$PATH
 if [ -f "\$SPACK_ROOT/share/spack/setup-env.sh" ]; then
     . "\$SPACK_ROOT/share/spack/setup-env.sh"
 fi
 EOF
-    
-    echo "setting up system-wide spack configuration..."
-    bash "${SCRIPT_DIR}/../config/setup_system_spack_config.sh"
-
-    echo "sourcing spack_env_file..."
-    source "$SPACK_ENV_FILE"   
 
     # Minimal compiler/build dependencies
     dnf -y install \
@@ -43,16 +39,19 @@ EOF
     make patch tar gzip bzip2 xz unzip \
     findutils git which file
 
-    # Install Moudle Systems
-    spack install "$MODULES_TYPE"
-    
+    echo "setting up system-wide spack configuration..."
+    bash "${SCRIPT_DIR}/../config/setup_system_spack_config.sh"
 
-    # Register system compiler with Spack
-    spack install "$COMPILER"
-    spack load "$COMPILER"
-    spack compiler add
+    echo "sourcing spack_env_file..."
+    source "$SPACK_ENV_FILE"
+
+    # Verify system compiler configured by setup_system_spack_config.sh
     spack compiler list
-    spack unload --all
+
+    # Install module system
+    if [ "$MODULES_ENABLED" = "true" ]; then
+        spack install "$MODULES_TYPE"
+    fi
 
     info "Spack installed successfully"
 }
@@ -82,13 +81,10 @@ configure_modules() {
     fi
     
     info "Configuring environment modules..."
-    
-    # Enable environment modules
-    spack config add "modules:enable:$MODULES_TYPE"
-    
+
     # Generate module files
     if [ "$MODULES_REFRESH" = "true" ]; then
-        spack module "$MODULES_TYPE" refresh
+        spack module "$MODULES_TYPE" refresh -y
     fi
     
     info "Environment modules configured successfully"

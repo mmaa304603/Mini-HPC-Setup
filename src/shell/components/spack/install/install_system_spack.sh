@@ -9,12 +9,14 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
 CONFIG_SCRIPT="${SCRIPT_DIR}/../config/setup_system_spack_config.sh"
 PROFILE_FILE="/etc/profile.d/spack.sh"
+NETWORK_CONFIG="${SCRIPT_DIR}/../../network/network.conf"
 
 # Configuration
 SPACK_VERSION="v0.23.1"
 SPACK_INSTALL_DIR="/opt/spack"  # System-wide Spack installation
 SPACK_CONFIG_DIR="/etc/spack"   # System-wide Spack configurations
 SPACK_REPO="https://github.com/spack/spack.git"
+SPACK_CPU_IMAGE_NAME="rockylinux-9.6"
 TEMP_DIR=$(mktemp -d)           # Temporary directory for cloning
 SPACK_INSTALL_NEEDED=true
 
@@ -183,6 +185,17 @@ create_directory_structure() {
     print_status "Directory structure created"
 }
 
+install_system_dependencies() {
+    echo "Installing system compiler and build dependencies..."
+
+    dnf -y install \
+        gcc gcc-c++ gcc-gfortran \
+        make patch tar gzip bzip2 xz unzip \
+        findutils git which file
+
+    print_status "System dependencies installed"
+}
+
 # Function to install Spack
 install_spack() {
     if [ "$SPACK_INSTALL_NEEDED" != true ]; then
@@ -218,60 +231,77 @@ install_spack() {
     print_status "Spack installed successfully"
 }
 
-# Function to setup initial configuration
-setup_initial_config() {
-    echo "Setting up initial Spack configuration..."
-    
-    # Create config.yaml
-    cat > "$SPACK_CONFIG_DIR/config.yaml" << EOF
-config:
-  install_tree:
-    root: $SPACK_INSTALL_DIR/opt/spack
-    projections:
-      all: '{name}/{version}-{compiler.name}-{compiler.version}/{hash}'
-  build_stage:
-    - /tmp/spack-stage
-  source_cache: $SPACK_INSTALL_DIR/sources
-  misc_cache: $SPACK_INSTALL_DIR/cache
-  module_roots:
-    tcl: $SPACK_INSTALL_DIR/modules/tcl
-    lmod: $SPACK_INSTALL_DIR/modules/lmod
-  build_language: C
-  build_jobs: 8
-EOF
-
-    # Set proper permissions
-    chmod 644 "$SPACK_CONFIG_DIR/config.yaml"
-    chown root:root "$SPACK_CONFIG_DIR/config.yaml"
-
-    print_status "Initial configuration created"
-}
-
-add_spack_profile_script() {
+configure_spack() {
     if [ -f "$CONFIG_SCRIPT" ]; then
         echo "Running Spack system configuration script..."
         bash "$CONFIG_SCRIPT"
     else
-        print_warning "Spack configuration script not found: $CONFIG_SCRIPT"
+        print_error "Spack configuration script not found: $CONFIG_SCRIPT"
+        exit 1
     fi
 
-    echo "Adding Spack environment to $PROFILE_FILE"
-
-    cat > "$PROFILE_FILE" << EOF
-export SPACK_ROOT=$SPACK_INSTALL_DIR
-export PATH=\$SPACK_ROOT/bin:\$PATH
-. "\$SPACK_ROOT/share/spack/setup-env.sh"
-EOF
-
-    chmod 644 "$PROFILE_FILE"
-
-    # Apply it immediately for the current script
     if ! source "$PROFILE_FILE"; then
         echo "Failed to source profile file"
         return 1
     fi
 
-    echo "Spack profile script added successfully."
+    spack compiler list
+
+    print_status "Spack configured successfully"
+}
+
+configure_compute_node_spack_access() {
+    local head_node_ip="${HEAD_NODE_IP:-10.0.0.1}"
+
+    if [ -f "$NETWORK_CONFIG" ]; then
+        source "$NETWORK_CONFIG"
+        head_node_ip="${HEAD_NODE_IP:-$head_node_ip}"
+    fi
+
+    if ! command -v wwctl >/dev/null 2>&1; then
+        print_warning "wwctl not found; skipping Spack access configuration in Warewulf CPU image"
+        return 0
+    fi
+
+    if ! wwctl image list | grep -q "$SPACK_CPU_IMAGE_NAME"; then
+        print_error "Warewulf image $SPACK_CPU_IMAGE_NAME not found; cannot configure compute-node Spack access"
+        wwctl image list || true
+        return 1
+    fi
+
+    if [ ! -f "$PROFILE_FILE" ]; then
+        print_error "Missing $PROFILE_FILE; cannot configure compute-node Spack access"
+        return 1
+    fi
+
+    echo "Configuring compute-node Spack access in Warewulf image $SPACK_CPU_IMAGE_NAME..."
+
+    wwctl image exec \
+        --bind "$PROFILE_FILE:/tmp/spack.sh:ro" \
+        "$SPACK_CPU_IMAGE_NAME" -- \
+        /usr/bin/env HEAD_NODE_IP="$head_node_ip" \
+        /bin/bash -c '
+            set -e
+            export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+            echo "Installing configuring packages..."
+            dnf -y install nfs-utils
+            mkdir -p /opt /etc/profile.d
+            install -o root -g root -m 0644 /tmp/spack.sh /etc/profile.d/spack.sh
+            sed -i "/ \/opt /d" /etc/fstab
+            printf "%s:/opt /opt nfs4 ro,nofail,_netdev,x-systemd.automount 0 0\n" "$HEAD_NODE_IP" >> /etc/fstab
+
+            echo "Enabling remote filesystem support..."
+            systemctl enable remote-fs.target
+
+            echo "Verifying Spack profile script..."
+            test -f /etc/profile.d/spack.sh
+
+            echo "Verifying /opt NFS mount entry..."
+            findmnt --fstab --mountpoint /opt --types nfs4 >/dev/null
+        '
+    
+    print_status "Compute-node Spack access configured"
 }
 
 # Main installation process
@@ -286,14 +316,17 @@ check_existing_spack_installation
 # Create directory structure
 create_directory_structure
 
+# Install compiler and build dependencies before registering compilers
+install_system_dependencies
+
 # Install Spack
 install_spack
 
-# Setup initial configuration
-setup_initial_config
+# Configure Spack and register system compilers
+configure_spack
 
-# Add Spack profile and execute
-add_spack_profile_script
+# Configure Warewulf compute nodes to use the head-node Spack tree when available
+configure_compute_node_spack_access
 
 # echo "System-wide Spack installation completed successfully!"
 # echo "Next steps:"
