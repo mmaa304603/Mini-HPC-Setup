@@ -49,7 +49,9 @@ install_munge() {
     info "Checking MUNGE key..."
     if [ ! -f /etc/munge/munge.key ]; then
         info "Generating MUNGE key..."
+        set +u
         /usr/sbin/create-munge-key
+        set -u
     else
         info "MUNGE key already exists; skipping generation"
     fi

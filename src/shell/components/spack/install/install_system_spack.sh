@@ -101,14 +101,16 @@ check_prerequisites() {
             missing_packages+=($package)
         fi
     done
-    
+
+    if ! python3 -m pip --version >/dev/null 2>&1; then
+        dnf install -y python3-pip
+    fi
+
     if [ ${#missing_packages[@]} -ne 0 ]; then
-        print_warning "The following Python packages are missing:"
-        printf '%s\n' "${missing_packages[@]}"
-        print_warning "Please install them using: pip3 install ${missing_packages[*]}"
-        read -p "Do you want to continue anyway? [y/N] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    print_warning "Installing missing Python packages:"
+    printf '%s\n' "${missing_packages[@]}"
+        if ! python3 -m pip install "${missing_packages[@]}"; then
+            print_warning "Failed to install one or more Python packages."
             exit 1
         fi
     fi
@@ -288,6 +290,10 @@ configure_compute_node_spack_access() {
             dnf -y install nfs-utils
             mkdir -p /opt /etc/profile.d
             install -o root -g root -m 0644 /tmp/spack.sh /etc/profile.d/spack.sh
+
+            mkdir -p /etc
+            touch /etc/fstab
+            chmod 0644 /etc/fstab
             sed -i "/ \/opt /d" /etc/fstab
             printf "%s:/opt /opt nfs4 ro,nofail,_netdev,x-systemd.automount 0 0\n" "$HEAD_NODE_IP" >> /etc/fstab
 

@@ -46,7 +46,7 @@ path.data: /var/lib/elasticsearch
 path.logs: /var/log/elasticsearch
 EOF
 
-    echo "Allowing elasticsearch user to create the keystore, locking config dir back down"
+    info "Allowing elasticsearch user to create the keystore, locking config dir back down"
     chown root:elasticsearch /etc/elasticsearch
     chmod 2750 /etc/elasticsearch
 
@@ -56,7 +56,7 @@ EOF
         chmod g-w /etc/elasticsearch
     fi
 
-    echo "Double checking permissions"
+    info "Double checking Elasticsearch keystore permissions"
     chown root:elasticsearch /etc/elasticsearch/elasticsearch.keystore
     chmod 660 /etc/elasticsearch/elasticsearch.keystore
     
@@ -79,6 +79,7 @@ install_logstash() {
     dnf install -y logstash
     
     # Configure Logstash
+    ensure_dir "$LOGSTASH_CONF_DIR"
     cat > "$LOGSTASH_CONF_DIR/slurm.conf" << EOF
 input {
   beats {
@@ -227,4 +228,4 @@ main() {
     info "Monitoring setup completed successfully"
 }
 
-main "$@" 
+main "$@"

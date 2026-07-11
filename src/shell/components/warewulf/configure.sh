@@ -17,6 +17,59 @@ else
     warn "nodes.conf not found; compute node operations will be skipped unless arrays are set elsewhere"
 fi
 
+patch_dhcp_config() {
+    local dhcp_conf="/etc/dhcp/dhcpd.conf"
+    local subnet_line="subnet ${NETWORK} netmask ${NETWORK_MASK} {"
+    info "Patching DHCP configuration..."
+
+    if [ ! -f "$dhcp_conf" ]; then
+        warn "$dhcp_conf not found; skipping DHCP patch"
+        return 0
+    fi
+
+    if ! grep -q "ignore-client-uids true;" "$dhcp_conf"; then
+        sed -i "/${subnet_line}/a\\    ignore-client-uids true;" "$dhcp_conf" || {
+            error "Failed to add ignore-client-uids to DHCP config"
+            return 1
+        }
+    fi
+
+    for i in "${!COMPUTE_NODES[@]}"; do
+        local node="${COMPUTE_NODES[$i]}"
+        local ip="${COMPUTE_NODE_IPS[$i]:-}"
+        local hwaddr="${COMPUTE_NODE_HWADDRS[$i]:-}"
+
+        [ -n "$ip" ] && [ -n "$hwaddr" ] || continue
+        grep -qi "$hwaddr" "$dhcp_conf" && continue
+
+        {
+            echo ""
+            echo "host ${node} {"
+            echo "    hardware ethernet ${hwaddr};"
+            echo "    fixed-address ${ip};"
+            echo "    option host-name \"${node}\";"
+            echo "}"
+        } >> "$dhcp_conf" || {
+            error "Failed to add DHCP reservation for $node"
+            return 1
+        }
+    done
+
+    if [ -n "${BLOCKED_MAC:-}" ] && ! grep -qi "$BLOCKED_MAC" "$dhcp_conf"; then
+        echo "Disabling $BLOCKED_MAC from DHCP..."
+        {
+            echo ""
+            echo "host blocked-device {"
+            echo "    hardware ethernet ${BLOCKED_MAC};"
+            echo "    deny booting;"
+            echo "}"
+        } >> "$dhcp_conf" || {
+            error "Failed to add blocked device to DHCP config"
+            return 1
+        }
+    fi
+}
+
 regenerate_dhcp_config() {
     info "Regenerating DHCP configuration from Warewulf..."
 
@@ -24,6 +77,10 @@ regenerate_dhcp_config() {
         error "Failed to regenerate DHCP configuration"
         return 1
     }
+
+    truncate -s 0 /var/lib/dhcpd/dhcpd.leases
+
+    patch_dhcp_config || return 1
 
     systemctl restart dhcpd || {
         error "Failed to restart DHCP service"
@@ -113,19 +170,28 @@ configure_compute_nodes() {
 
     if [ "${#COMPUTE_NODE_HWADDRS[@]}" -eq 0 ]; then
         warn "No COMPUTE_NODE_HWADDRS defined; DHCP leases will stay within the configured pool, but physical node-to-IP order is not guaranteed"
+    elif [ "${#COMPUTE_NODE_HWADDRS[@]}" -ne "${#COMPUTE_NODES[@]}" ]; then
+        warn "COMPUTE_NODE_HWADDRS count does not match COMPUTE_NODES; missing entries will be ignored"
     fi
 
     for i in "${!COMPUTE_NODES[@]}"; do
         local node="${COMPUTE_NODES[$i]}"
         local ip="${COMPUTE_NODE_IPS[$i]}"
+        local hwaddr="${COMPUTE_NODE_HWADDRS[$i]:-}"
         
-        info "Configuring node $node ($ip)..."
-        
-        # Add node to Warewulf
-        wwctl node add "$node" --ipaddr "$ip" --discoverable=true || {
-            error "Failed to add node $node"
-            continue
-        }
+        if [ -n "$hwaddr" ]; then
+            info "Configuring node $node ($ip, $hwaddr)..."
+            wwctl node add "$node" --ipaddr "$ip" --hwaddr "$hwaddr" --discoverable=true || {
+                error "Failed to add node $node"
+                continue
+            }
+        else
+            info "Configuring node $node ($ip)..."
+            wwctl node add "$node" --ipaddr "$ip" --discoverable=true || {
+                error "Failed to add node $node"
+                continue
+            }
+        fi
         
         # Set node profile
         wwctl node set "$node" --profile default -y || {

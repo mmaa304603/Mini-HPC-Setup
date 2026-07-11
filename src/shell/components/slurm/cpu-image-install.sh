@@ -75,7 +75,7 @@ install_slurm() {
     wwctl image exec "$IMAGE_NAME" -- /bin/bash -c '
         set -e
         export PATH=/usr/sbin:/usr/bin:/sbin:/bin
-
+        dnf -y install epel-release
         dnf -y install slurm slurm-slurmd
         # dnf -y install slurm-wlm slurmd slurm-client
     '

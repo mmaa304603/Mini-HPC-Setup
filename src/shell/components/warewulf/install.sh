@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Source common functions and configuration
 source "$(dirname "$0")/../../lib/functions.sh" || exit 1
@@ -10,6 +11,7 @@ export_config
 
 # Warewulf version for RPM installation
 WAREWULF_VERSION="4.6.4"
+WAREWULF_CONNECTION_NAME="${WAREWULF_CONNECTION_NAME:-cluster-internal}"
 
 # Install Warewulf
 install_warewulf() {
@@ -27,6 +29,31 @@ install_warewulf() {
     info "Warewulf installation completed successfully"
 }
 
+configure_head_node() {
+    : "${HEAD_NODE_HOSTNAME:?HEAD_NODE_HOSTNAME must be set in components/network/network.conf}"
+    local head_ip="${HEAD_NODE_IP:-${NETWORK_IP:-}}"
+    local head_interface="${HEAD_NETWORK_INTERFACE:-${NETWORK_INTERFACE:-}}"
+    local prefix="${CLUSTER_NETWORK_CIDR#*/}"
+
+    : "${head_ip:?HEAD_NODE_IP or NETWORK_IP must be set}"
+    : "${head_interface:?HEAD_NETWORK_INTERFACE or NETWORK_INTERFACE must be set}"
+    : "${CLUSTER_NETWORK_CIDR:?CLUSTER_NETWORK_CIDR must be set in components/network/network.conf}"
+
+    info "Configuring head node as ${HEAD_NODE_HOSTNAME} on ${head_interface} (${head_ip})"
+
+    hostnamectl set-hostname "$HEAD_NODE_HOSTNAME"
+
+    if grep -q "^${head_ip}[[:space:]]" /etc/hosts; then
+        sed -i "s/^${head_ip}[[:space:]].*/${head_ip} ${HEAD_NODE_HOSTNAME} ${HEAD_NODE_HOSTNAME}.localdomain/" /etc/hosts
+    else
+        echo "${head_ip} ${HEAD_NODE_HOSTNAME} ${HEAD_NODE_HOSTNAME}.localdomain" >> /etc/hosts
+    fi
+
+    nmcli connection delete "$WAREWULF_CONNECTION_NAME" 2>/dev/null || true
+    nmcli connection add type ethernet ifname "$head_interface" con-name "$WAREWULF_CONNECTION_NAME" \
+        ipv4.method manual ipv4.addresses "${head_ip}/${prefix}" ipv4.never-default yes connection.autoconnect yes
+    nmcli connection up "$WAREWULF_CONNECTION_NAME"
+}
 
 # Configure firewall
 configure_firewall() {
@@ -100,6 +127,9 @@ main() {
     
     # Install Warewulf
     install_warewulf
+
+    # Configure hostname and internal cluster interface before generating services.
+    configure_head_node
     
     # Configure firewalld first (as per official docs)
     configure_firewall
