@@ -80,6 +80,23 @@ install_apptainer() {
     rm -rf "$build_dir"
 }
 
+expose_apptainer_command() {
+    local installed_bin="${APPTAINER_INSTALL_PREFIX}/bin/apptainer"
+    local system_bin="/usr/bin/apptainer"
+
+    if command -v apptainer >/dev/null 2>&1; then
+        return 0
+    fi
+
+    if [ ! -x "$installed_bin" ]; then
+        error "Apptainer was not installed at expected path: $installed_bin"
+        return 1
+    fi
+
+    info "Exposing Apptainer command at ${system_bin}..."
+    ln -sfn "$installed_bin" "$system_bin"
+}
+
 # Configure Apptainer for HPC
 configure_apptainer() {
     local bind_path
@@ -240,8 +257,13 @@ install_into_cpu_image() {
 
     wwctl image exec "$APPTAINER_CPU_IMAGE_NAME" -- /bin/bash -lc "
         set -euo pipefail
+        dnf -y install dnf-plugins-core || true
         dnf -y install epel-release || true
+        dnf config-manager --set-enabled crb || true
+        dnf makecache -y || true
         dnf -y install apptainer squashfs-tools fuse-overlayfs fakeroot
+        command -v apptainer
+        rpm -q squashfs-tools fuse-overlayfs fakeroot
         mkdir -p '${APPTAINER_SYSCONFDIR}' '${APPTAINER_CACHE_DIR}' '$(dirname "$APPTAINER_SYSCONFIG")'
     "
 
@@ -268,6 +290,7 @@ main() {
     
     install_dependencies
     install_apptainer "$APPTAINER_INSTALL_PREFIX"
+    expose_apptainer_command
     configure_apptainer
     create_module_file
     create_example_recipes

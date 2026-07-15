@@ -304,8 +304,11 @@ configure_compute_node_spack_access() {
             test -f /etc/profile.d/spack.sh
 
             echo "Verifying /opt NFS mount entry..."
-            findmnt --fstab --mountpoint /opt --types nfs4 >/dev/null
+            findmnt --fstab --mountpoint /opt --types nfs,nfs4 >/dev/null
         '
+
+    wwctl image build "$SPACK_CPU_IMAGE_NAME"
+    wwctl overlay build || true
     
     print_status "Compute-node Spack access configured"
 }

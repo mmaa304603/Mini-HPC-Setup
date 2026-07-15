@@ -5,12 +5,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
     cat <<USAGE
-Usage: ./tests/run-tests.sh [all|unit|integration|performance|shell]
+Usage: ./tests/run-tests.sh [all|unit|integration|runtime|performance|shell]
 
 Environment:
   HPC_TEST_COMPONENTS       Components to verify, default: "spack apptainer"
-  HPC_TEST_COMPUTE_NODES    Space-separated compute nodes for SSH checks
-  HPC_TEST_ENABLE_COMPUTE   Set to 1 to use slurm.conf CPU nodes when nodes are not specified
+  HPC_TEST_COMPUTE_NODES    Space-separated compute nodes for runtime checks
+  HPC_TEST_ENABLE_COMPUTE   Set to 1 to use slurm.conf nodes when nodes are not specified
+  HPC_TEST_SRUN_OPTS        Extra options for runtime srun checks
 USAGE
 }
 
@@ -37,6 +38,9 @@ case "${1:-all}" in
         ;;
     integration)
         run_if_present "$REPO_ROOT/tests/integration/shell/run_tests.sh"
+        ;;
+    runtime)
+        run_if_present "$REPO_ROOT/tests/runtime/shell/run_tests.sh"
         ;;
     shell)
         run_if_present "$REPO_ROOT/tests/unit/shell/run_tests.sh"

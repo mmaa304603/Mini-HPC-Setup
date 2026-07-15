@@ -56,11 +56,15 @@ SPACK_INSTALLER="$TEST_SRC_SHELL_DIR/components/spack/install/install_system_spa
 SPACK_CONFIG="$TEST_SRC_SHELL_DIR/components/spack/config/setup_system_spack_config.sh"
 APPTAINER_INSTALLER="$TEST_SRC_SHELL_DIR/components/apptainer/install.sh"
 APPTAINER_CONFIG="$TEST_SRC_SHELL_DIR/components/apptainer/apptainer.conf"
+WAREWULF_CONFIG="$TEST_SRC_SHELL_DIR/components/warewulf/warewulf.conf"
+WAREWULF_CONFIGURE="$TEST_SRC_SHELL_DIR/components/warewulf/configure.sh"
 
 assert_file "$SPACK_INSTALLER" "Spack installer"
 assert_file "$SPACK_CONFIG" "Spack system config script"
 assert_file "$APPTAINER_INSTALLER" "Apptainer installer"
 assert_file "$APPTAINER_CONFIG" "Apptainer config"
+assert_file "$WAREWULF_CONFIG" "Warewulf config"
+assert_file "$WAREWULF_CONFIGURE" "Warewulf configure script"
 
 if [ -f "$SPACK_INSTALLER" ]; then
     for package in gcc gcc-c++ gcc-gfortran make patch tar gzip bzip2 xz unzip findutils git which file; do
@@ -92,6 +96,15 @@ fi
 if [ -f "$APPTAINER_CONFIG" ]; then
     assert_contains "$APPTAINER_CONFIG" "APPTAINER_CPU_IMAGE_ENABLED=true" "Apptainer compute image checks are enabled in config"
     assert_contains "$APPTAINER_CONFIG" "APPTAINER_CPU_IMAGE_NAME=" "Apptainer compute image name is configured"
+fi
+
+if [ -f "$WAREWULF_CONFIG" ]; then
+    assert_contains "$WAREWULF_CONFIG" "path:[[:space:]]+/opt" "Warewulf exports /opt"
+fi
+
+if [ -f "$WAREWULF_CONFIGURE" ]; then
+    assert_contains "$WAREWULF_CONFIGURE" "configure_shared_opt_mount_overlay" "Warewulf configures shared /opt mount overlay"
+    assert_contains "$WAREWULF_CONFIGURE" "mount /opt" "Warewulf mounts /opt during node initialization"
 fi
 
 if [ "$failures" -ne 0 ]; then

@@ -137,6 +137,49 @@ update_vnfs() {
     info "VNFS image update completed"
 }
 
+configure_shared_opt_mount_overlay() {
+    local mount_script
+
+    info "Configuring Warewulf init script to mount shared /opt..."
+
+    mount_script="$(mktemp)"
+    cat > "$mount_script" <<'EOF'
+#!/bin/sh
+
+echo "Warewulf prescript: mount shared /opt"
+
+mkdir -p /opt
+
+if mountpoint -q /opt; then
+    exit 0
+fi
+
+for attempt in 1 2 3 4 5; do
+    if mount /opt; then
+        exit 0
+    fi
+    sleep 2
+done
+
+echo "Warning: failed to mount shared /opt"
+EOF
+
+    wwctl overlay import -p -o wwinit "$mount_script" /warewulf/init.d/85-mount-opt || {
+        rm -f "$mount_script"
+        error "Failed to import /opt mount script into Warewulf wwinit overlay"
+        return 1
+    }
+
+    wwctl overlay chmod wwinit /warewulf/init.d/85-mount-opt 0755 || {
+        rm -f "$mount_script"
+        error "Failed to mark /opt mount script executable in Warewulf wwinit overlay"
+        return 1
+    }
+
+    rm -f "$mount_script"
+    info "Warewulf /opt mount script configured"
+}
+
 # Remove existing compute nodes defined in nodes.conf
 remove_existing_nodes() {
     info "Removing existing configured compute nodes..."
@@ -221,6 +264,8 @@ main() {
     
     # Update VNFS image
     update_vnfs
+
+    configure_shared_opt_mount_overlay
 
     # Configure compute nodes
     configure_compute_nodes
