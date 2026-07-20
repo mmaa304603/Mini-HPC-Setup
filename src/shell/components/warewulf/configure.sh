@@ -34,27 +34,6 @@ patch_dhcp_config() {
         }
     fi
 
-    for i in "${!COMPUTE_NODES[@]}"; do
-        local node="${COMPUTE_NODES[$i]}"
-        local ip="${COMPUTE_NODE_IPS[$i]:-}"
-        local hwaddr="${COMPUTE_NODE_HWADDRS[$i]:-}"
-
-        [ -n "$ip" ] && [ -n "$hwaddr" ] || continue
-        grep -qi "$hwaddr" "$dhcp_conf" && continue
-
-        {
-            echo ""
-            echo "host ${node} {"
-            echo "    hardware ethernet ${hwaddr};"
-            echo "    fixed-address ${ip};"
-            echo "    option host-name \"${node}\";"
-            echo "}"
-        } >> "$dhcp_conf" || {
-            error "Failed to add DHCP reservation for $node"
-            return 1
-        }
-    done
-
     if [ -n "${BLOCKED_MAC:-}" ] && ! grep -qi "$BLOCKED_MAC" "$dhcp_conf"; then
         echo "Disabling $BLOCKED_MAC from DHCP..."
         {
@@ -88,6 +67,20 @@ regenerate_dhcp_config() {
     }
 }
 
+regenerate_nfs_config() {
+    info "Regenerating NFS configuration from Warewulf..."
+
+    wwctl configure nfs || {
+        error "Failed to regenerate NFS configuration"
+        return 1
+    }
+
+    systemctl restart nfs-server || {
+        error "Failed to restart NFS service"
+        return 1
+    }
+}
+
 # Update Warewulf configuration (post-installation)
 update_warewulf_config() {
     info "Updating Warewulf configuration..."
@@ -105,6 +98,7 @@ update_warewulf_config() {
     sed -i "s/range start: 10.0.1.1/range start: ${DHCP_START}/" /etc/warewulf/warewulf.conf
     sed -i "s/range end: 10.0.1.255/range end: ${DHCP_END}/" /etc/warewulf/warewulf.conf
     regenerate_dhcp_config || return 1
+    regenerate_nfs_config || return 1
 
     # Restart Warewulf service
     systemctl restart warewulfd || {
@@ -118,17 +112,18 @@ update_warewulf_config() {
 # Update VNFS image (post-installation)
 update_vnfs() {
     info "Updating VNFS image..."
+    local image_name="${WAREWULF_IMAGE_NAME:-rockylinux-9.6}"
     
     # Check if image exists, if not create it
-    if ! wwctl image list | grep -q "rockylinux-9.6"; then
+    if ! wwctl image list | grep -q "$image_name"; then
         info "VNFS image not found, creating new image..."
-        wwctl image import "docker://ghcr.io/warewulf/warewulf-rockylinux:9.6" "rockylinux-9.6" --build || {
+        wwctl image import "docker://ghcr.io/warewulf/warewulf-rockylinux:9.6" "$image_name" --build || {
             error "Failed to import base node image"
             return 1
         }
     else
         info "VNFS image already exists, updating..."
-        wwctl image build "rockylinux-9.6" || {
+        wwctl image build "$image_name" || {
             error "Failed to rebuild VNFS image"
             return 1
         }
@@ -140,7 +135,7 @@ update_vnfs() {
 configure_shared_opt_mount_overlay() {
     local mount_script
 
-    info "Configuring Warewulf init script to mount shared /opt..."
+    info "Configuring Warewulf init script to mount shared /opt and /home..."
 
     mount_script="$(mktemp)"
     cat > "$mount_script" <<'EOF'
@@ -152,13 +147,13 @@ mkdir -p /opt
 
 if mountpoint -q /opt; then
     exit 0
-fi
+    fi
 
-for attempt in 1 2 3 4 5; do
+    for attempt in 1 2 3 4 5; do
     if mount /opt; then
         exit 0
-    fi
-    sleep 2
+        fi
+        sleep 2
 done
 
 echo "Warning: failed to mount shared /opt"
@@ -178,6 +173,19 @@ EOF
 
     rm -f "$mount_script"
     info "Warewulf /opt mount script configured"
+}
+
+configure_default_profile_overlays() {
+    info "Configuring default Warewulf profile overlays..."
+
+    wwctl profile set default \
+        --image "${WAREWULF_IMAGE_NAME:-rockylinux-9.6}" \
+        --system-overlays "${WAREWULF_SYSTEM_OVERLAYS:-wwinit,wwclient,hostname,ssh.host_keys,systemd.netname,NetworkManager}" \
+        --runtime-overlays "${WAREWULF_RUNTIME_OVERLAYS:-hosts,ssh.authorized_keys}" \
+        -y || {
+            error "Failed to configure default Warewulf profile overlays"
+            return 1
+        }
 }
 
 # Remove existing compute nodes defined in nodes.conf
@@ -220,25 +228,35 @@ configure_compute_nodes() {
     for i in "${!COMPUTE_NODES[@]}"; do
         local node="${COMPUTE_NODES[$i]}"
         local ip="${COMPUTE_NODE_IPS[$i]}"
+        local netdev="${COMPUTE_NODE_NETDEVS[$i]:-${COMPUTE_NODE_NETDEV:-${HEAD_NETWORK_INTERFACE:-}}}"
+        local netmask="${COMPUTE_NODE_NETMASKS[$i]:-${COMPUTE_NODE_NETMASK:-${NETWORK_MASK}}}"
         local hwaddr="${COMPUTE_NODE_HWADDRS[$i]:-}"
+        local node_set_args=(
+            --profile default
+            --netname default
+            --ipaddr "$ip"
+            --netmask "$netmask"
+        )
+
+        [ -z "$netdev" ] || node_set_args+=(--netdev "$netdev")
+        [ -z "$hwaddr" ] || node_set_args+=(--hwaddr "$hwaddr")
         
         if [ -n "$hwaddr" ]; then
-            info "Configuring node $node ($ip, $hwaddr)..."
-            wwctl node add "$node" --ipaddr "$ip" --hwaddr "$hwaddr" --discoverable=true || {
+            info "Adding node $node ($ip, $hwaddr)..."
+            wwctl node add "$node" --discoverable=true || {
                 error "Failed to add node $node"
                 continue
             }
         else
-            info "Configuring node $node ($ip)..."
-            wwctl node add "$node" --ipaddr "$ip" --discoverable=true || {
+            info "Adding node $node ($ip)..."
+            wwctl node add "$node" --discoverable=true || {
                 error "Failed to add node $node"
                 continue
             }
         fi
         
-        # Set node profile
-        wwctl node set "$node" --profile default -y || {
-            error "Failed to set profile for node $node"
+        wwctl node set "$node" "${node_set_args[@]}" -y || {
+            error "Failed to set network configuration for node $node"
             continue
         }
         
@@ -247,8 +265,6 @@ configure_compute_nodes() {
             error "Failed to configure node $node"
             continue
         }
-
-        wwctl profile set default --image rockylinux-9.6 -y
 
     done
 
@@ -266,6 +282,8 @@ main() {
     update_vnfs
 
     configure_shared_opt_mount_overlay
+
+    configure_default_profile_overlays
 
     # Configure compute nodes
     configure_compute_nodes

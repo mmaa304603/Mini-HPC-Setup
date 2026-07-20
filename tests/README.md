@@ -14,6 +14,9 @@ tests/
 │   ├── ansible/      # Ansible playbook tests
 │   └── shell/        # Shell integration tests
 │
+├── runtime/           # Runtime checks against deployed nodes
+│   └── shell/         # Shell runtime tests
+│
 ├── performance/       # Performance tests
 │   ├── ansible/      # Ansible performance tests
 │   └── shell/        # Shell performance tests
@@ -49,6 +52,14 @@ tests/
   - Response times
   - Throughput
 
+### Runtime Tests
+- Test deployed compute-node access and scheduler launch behavior
+- Located in `tests/runtime/`
+- Focus on:
+  - SSH access to compute nodes
+  - Runtime availability of Spack and Apptainer
+  - `srun` launch checks through SLURM
+
 ### Test Data
 - Data used for testing
 - Located in `tests/data/`
@@ -72,8 +83,20 @@ tests/
 # Integration tests
 ./run-tests.sh integration
 
+# Runtime tests
+./run-tests.sh runtime
+
 # Performance tests
 ./run-tests.sh performance
+```
+
+### Runtime Test Environment
+```bash
+# Space-separated compute nodes for runtime checks
+HPC_TEST_COMPUTE_NODES="cpu01 cpu02 cpu03" ./run-tests.sh runtime
+
+# Or use nodes from the SLURM config
+HPC_TEST_ENABLE_COMPUTE=1 ./run-tests.sh runtime
 ```
 
 ## Test Data

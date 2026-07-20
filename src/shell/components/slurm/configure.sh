@@ -17,9 +17,9 @@ configure_slurm() {
     info "Configuring SLURM..."
 
     local cpu_nodelist="${SLURM_CPU_NODELIST:-cpu[01-03]}"
-    local cpu_cpus="${SLURM_CPU_CPUS:-8}"
+    local cpu_cpus="${SLURM_CPU_CPUS:-4}"
     local cpu_sockets="${SLURM_SOCKETS:-1}"
-    local cpu_cores_per_socket="${SLURM_CORES_PER_SOCKET:-8}"
+    local cpu_cores_per_socket="${SLURM_CORES_PER_SOCKET:-4}"
     local cpu_threads_per_core="${SLURM_THREADS_PER_CORE:-1}"
     local cpu_real_memory="${SLURM_DEFAULT_MEM:-32000}"
     local slurmctld_port="${SLURMCTLD_PORT:-6817}"

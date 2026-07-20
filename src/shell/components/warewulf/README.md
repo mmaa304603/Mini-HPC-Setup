@@ -149,7 +149,7 @@ Head Node (10.0.0.1)
 └── Firewall (Services: warewulf, dhcp, nfs, tftp)
 
 Compute Nodes
-├── CPU Nodes (10.0.1.1-10.0.1.255) - Managed by Warewulf
+├── CPU Nodes (10.0.2.1-10.0.2.3) - Managed by Warewulf
 ├── GPU Node (10.0.2.4) - Static IP, not managed by Warewulf
 └── Network Boot → Warewulf Provisioning
 ```

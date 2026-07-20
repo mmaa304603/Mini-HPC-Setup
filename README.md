@@ -15,7 +15,7 @@ Only the head node is connected to the public network. All compute nodes are con
 
 - **Head Node Private IP**: 10.0.0.1
 - **Subnet Mask**: 255.255.252.0 (10.0.0.0/22)
-- **DHCP Range**: 10.0.1.1 - 10.0.1.3 (for PXE booting CPU compute nodes)
+- **DHCP Range**: 10.0.1.1 - 10.0.1.255 (for PXE booting CPU compute nodes)
 - **Static Node Addresses**: 
   - 10.0.2.1 - 10.0.2.3 (CPU compute nodes)
   - 10.0.2.4 (GPU compute node)
