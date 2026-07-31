@@ -14,7 +14,7 @@ If you maintain a rendering helper (e.g., `generate_config`), source it and run:
 source "$(dirname "$0")/../lib/functions.sh"
 source "$(dirname "$0")/../lib/config.sh"
 
-load_config "network.conf"
+load_component_config "network"
 
 # Example paths
 TEMPLATE_PATH="$(dirname "$0")/../templates/core/example.conf.j2"

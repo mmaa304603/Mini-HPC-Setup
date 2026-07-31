@@ -48,13 +48,8 @@ src/shell/
 │   ├── config.sh          # Configuration loading/export helpers
 │   └── install.sh         # Environment Modules installer
 │
-├── config/                # ⚙️ Configuration Management
-│   ├── network.conf       # Network topology and IP assignments
-│   ├── slurm.conf         # SLURM cluster configuration
-│   ├── spack.conf         # Spack package manager settings
-│   ├── monitoring.conf    # ELK/Grafana/Prometheus stack config
-│   ├── squid.conf         # Squid proxy configuration
-│   └── apptainer.conf     # Apptainer container settings
+├── config/                # ⚙️ Global configuration defaults
+│   └── config.conf        # Shared paths and feature flags
 │
 ├── components/            # 🏗️ Service Installers
 │   ├── base/              # Base OS prerequisites (Rocky & Jetson)
@@ -65,7 +60,7 @@ src/shell/
 │   ├── grafana/           # Metrics visualization
 │   ├── globus/            # Data transfer and sharing
 │   ├── eraider/           # Authentication and identity
-│   ├── squid/             # HTTP proxy and caching
+│   ├── filebeat/          # Log shipping
 │   └── apptainer/         # Container runtime
 │
 ├── maintenance/           # 🔄 Operational Scripts
@@ -103,8 +98,8 @@ cd src/shell
 ### 🏗️ Typical Workflow
 ```bash
 # 1. Configure your cluster settings
-vim config/network.conf
-vim config/slurm.conf
+vim components/network/network.conf
+vim components/slurm/slurm.conf
 
 # 2. Prepare base OS (Rocky headnode or Jetson)
 ./components/base/install.sh        # OS updates + essential tools
@@ -118,7 +113,7 @@ vim config/slurm.conf
 ./bin/hpc-setup --step monitoring   # Install monitoring stack
 
 # 4. Verify installation
-./bin/hpc-test --all
+./bin/hpc-test run all
 
 # 5. Start daily operations
 ./maintenance/maintenance_daily.sh
@@ -172,7 +167,7 @@ check_root   # Ensures script runs as root when needed
 #### Configuration Loading
 ```bash
 # Load only needed configurations
-load_config "network.conf"  # Load specific config file
+load_component_config "network"
 export_config               # Make variables available to child processes
 ```
 
@@ -204,9 +199,9 @@ Each component provides self-contained installation and configuration:
 - **`spack/`** - Package manager for scientific software installation
 - **`elk/`** - Elasticsearch, Logstash, Kibana for log aggregation and analysis
 - **`grafana/`** - Metrics visualization and dashboard platform
+- **`filebeat/`** - Log shipping into the monitoring stack
 - **`globus/`** - Secure data transfer and sharing capabilities
 - **`eraider/`** - Authentication and identity management
-- **`squid/`** - HTTP proxy and caching for improved performance
 - **`apptainer/`** - Container runtime for reproducible environments
 
 ### 🔄 Operational Scripts (`maintenance/`)
@@ -263,7 +258,7 @@ User-facing commands for cluster management:
 1. Create directory in `components/`
 2. Add `install.sh` script following existing patterns
 3. Source libraries: `source "$(dirname "$0")/../../lib/functions.sh"`
-4. Load configuration: `load_config "component.conf"`
+4. Load configuration: `load_component_config "component"`
 5. Use standard functions: `check_root`, `info`, `error`, `install_package`
 
 ## Support & Documentation

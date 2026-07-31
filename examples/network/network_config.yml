@@ -1,8 +1,19 @@
 # Network Configuration Example
 
 # Network Interface Configuration
-network_interfaces:
-  enp2s0:
+
+# network_interfaces:
+#  enp2s0:
+#    type: ethernet
+#    ip: 10.0.0.1
+#    netmask: 255.255.252.0
+#    gateway: 10.0.0.1
+#    dns:
+#      - 8.8.8.8
+#      - 8.8.4.4
+
+network_interfaces: # Change network interface due to hardware constraints while testing
+  enp0s8:
     type: ethernet
     ip: 10.0.0.1
     netmask: 255.255.252.0

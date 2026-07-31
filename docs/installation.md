@@ -16,7 +16,7 @@ Before starting the installation, ensure you have:
 
 2. **Network Requirements**
    - Static IP for head node (10.0.0.1)
-   - DHCP range for compute nodes (10.0.1.1 - 10.0.1.3)
+   - DHCP range for compute nodes (10.0.1.1 - 10.0.1.255)
    - Static node addresses (10.0.2.1 - 10.0.2.4)
    - Network interface for provisioning (enp2s0)
    - Open ports for Globus (443, 80, 2811, 50000-51000)

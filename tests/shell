@@ -4,7 +4,9 @@
 
 # Check network interface
 echo "Checking network interface..."
-ip addr show enp2s0
+
+# ip addr show enp2s0
+ip addr show enp0s8 # Change network interface due to hardware constraints while testing
 
 # Check routing table
 echo "Checking routing table..."

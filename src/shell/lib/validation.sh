@@ -36,7 +36,7 @@ validate_hostname() {
 validate_port() {
     local port=$1
 
-    if [[ ! $port =~ ^[0-9]+$ ]] || [ $port -lt 1 ] || [ $port -gt 65535 ]; then
+    if [[[ ! $port =~ ^[0-9]+$ ]] || [ $port -lt 1 ] || [ $port -gt 65535 ]]; then
         handle_error $ERR_INVALID_ARG "Invalid port number: $port"
         return $ERR_INVALID_ARG
     fi
