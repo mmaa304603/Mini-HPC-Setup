@@ -1,0 +1,7 @@
+{
+  "type": "live_command_proposal",
+  "created_at": "2026-08-16T01:44:19-05:00",
+  "command": "wwctl overlay build",
+  "reason": "Rebuild Warewulf overlays after configuration changes.",
+  "note": "This proposal is not auto-applied. Review and run manually if approved."
+}
