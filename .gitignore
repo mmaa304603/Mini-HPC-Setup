@@ -37,6 +37,8 @@ venv/
 ENV/
 env/
 .env/
+.venv-crewai/
+.crewai_storage/
 
 # IDE
 .idea/
