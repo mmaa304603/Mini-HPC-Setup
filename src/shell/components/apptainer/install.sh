@@ -135,9 +135,11 @@ allow network = yes
 # MPI configuration
 mpi config file = ${APPTAINER_SYSCONFDIR}/mpi.conf
 
-# Limit container resources
-limit container groups = 65536
-limit container owners = @wheel
+# Compute nodes may not have a host /etc/resolv.conf in the stateless image.
+config resolv_conf = no
+
+# Leave container ownership unrestricted. These directives are parsed as
+# username/group allow-lists and are not needed for this cluster.
 EOF
     
     # Create MPI configuration

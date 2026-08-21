@@ -70,6 +70,11 @@ regenerate_dhcp_config() {
 regenerate_nfs_config() {
     info "Regenerating NFS configuration from Warewulf..."
 
+    mkdir -p /shared || {
+        error "Failed to create /shared"
+        return 1
+    }
+
     wwctl configure nfs || {
         error "Failed to regenerate NFS configuration"
         return 1
@@ -135,28 +140,48 @@ update_vnfs() {
 configure_shared_opt_mount_overlay() {
     local mount_script
 
-    info "Configuring Warewulf init script to mount shared /opt and /home..."
+    info "Configuring Warewulf init script to mount shared /opt and /shared..."
 
     mount_script="$(mktemp)"
-    cat > "$mount_script" <<'EOF'
+    cat > "$mount_script" <<EOF
 #!/bin/sh
 
-echo "Warewulf prescript: mount shared /opt"
+HEAD_NODE_IP="${HEAD_NODE_IP}"
+
+echo "Warewulf prescript: mount shared /opt and /shared"
 
 mkdir -p /opt
+mkdir -p /shared
 
-if mountpoint -q /opt; then
-    exit 0
-    fi
-
-    for attempt in 1 2 3 4 5; do
-    if mount /opt; then
-        exit 0
+if ! mountpoint -q /shared; then
+    for attempt in \$(seq 1 10); do
+        if mount -t nfs4 -o rw,_netdev "\${HEAD_NODE_IP}:/shared" /shared; then
+            break
         fi
-        sleep 2
-done
+        sleep 8
+    done
+fi
 
-echo "Warning: failed to mount shared /opt"
+if ! mountpoint -q /shared; then
+    echo "Warning: failed to mount shared /shared"
+    exit 1
+fi
+
+if ! mountpoint -q /opt; then
+    for attempt in \$(seq 1 10); do
+        if mount /opt; then
+            break
+        fi
+        sleep 8
+    done
+fi
+
+if ! mountpoint -q /opt; then
+    echo "Warning: failed to mount shared /opt"
+    exit 1
+fi
+
+exit 0
 EOF
 
     wwctl overlay import -p -o wwinit "$mount_script" /warewulf/init.d/85-mount-opt || {
@@ -168,6 +193,12 @@ EOF
     wwctl overlay chmod wwinit /warewulf/init.d/85-mount-opt 0755 || {
         rm -f "$mount_script"
         error "Failed to mark /opt mount script executable in Warewulf wwinit overlay"
+        return 1
+    }
+
+    wwctl overlay build || {
+        rm -f "$mount_script"
+        error "Failed to rebuild Warewulf overlays"
         return 1
     }
 

@@ -101,3 +101,7 @@ node_modules/
 
 # External repositories
 Globus_Experiences_from_Sol_Luna/**
+
+# AI Agent temporary files
+ai_agents/crewai_hpc/transcripts/**
+ai_agents/crewai_hpc/change_proposals/**
