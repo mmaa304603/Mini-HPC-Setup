@@ -15,13 +15,43 @@ monitoring files.
 - `HPC Operations Reliability Reviewer`
 - `Technical Documentation Reviewer`
 
+## Version and Environment Requirements
+
+Required:
+
+- Python 3.10 or newer for live CrewAI runs.
+- `crewai[tools]>=0.150.0`, installed from `requirements.txt`.
+- An LLM API key for live agent modes. Set at least one provider key supported by the selected CrewAI model.
+- SQLite 3.35.0 or newer for CrewAI/ChromaDB storage, or install `pysqlite3` so the local compatibility workaround can replace the standard `sqlite3` module.
+
+Environment variables:
+
+- `OPENAI_API_KEY`: Required when using an OpenAI-backed CrewAI model.
+- `ANTHROPIC_API_KEY`: Optional, only needed when using an Anthropic-backed model.
+- `CREWAI_MODEL`: Optional model override. Defaults to `gpt-4o-mini`.
+- `CREWAI_STORAGE_DIR`: Optional storage directory. Defaults to `.crewai_storage` at the repository root.
+- `HPC_SUDO_PASSWORD`: Optional and only needed for guarded commands that require sudo on cluster nodes.
+
+Cluster command requirements depend on the selected mode:
+
+- Slurm inspection and job modes require commands such as `sinfo`, `scontrol`, `sbatch`, and `srun`.
+- Warewulf inspection modes require `wwctl`.
+- Spack checks require `spack`.
+- Apptainer checks require `apptainer`.
+
+Check local readiness with:
+
+```bash
+python3 ai_agents/crewai_hpc/hpc_crewai.py --check-env
+```
+
 ## Live CrewAI Run
 
 Current CrewAI releases require Python 3.10+ and an LLM API key. On a machine
 with those available:
 
 ```bash
-cd /home/jay/Mini-HPC-Setup_shell
+cd /home/jay/Mini-HPC-Setup
 python3.11 -m venv .venv-crewai
 source .venv-crewai/bin/activate
 python -m pip install -r ai_agents/crewai_hpc/requirements.txt
