@@ -197,33 +197,3 @@ python ai_agents/crewai_hpc/hpc_crewai.py --check-node-apptainer version --node-
 python ai_agents/crewai_hpc/hpc_crewai.py --check-node-apptainer config --node-timeout 60
 unset HPC_SUDO_PASSWORD
 ```
-
-## Evidence Run On This Host
-
-This host currently has Python 3.9 and no exported LLM API key, so the script
-also supports a local dry run that generates the same evidence package without
-claiming a live LLM run:
-
-```bash
-python3 ai_agents/crewai_hpc/hpc_crewai.py --check-env
-python3 ai_agents/crewai_hpc/hpc_crewai.py --dry-run \
-  --output ai_agents/crewai_hpc/crewai_hpc_evidence.md
-```
-
-If CrewAI is installed in a temporary path, you can also prove that CrewAI was
-imported and used to instantiate `Agent`, `Task`, and `Crew` objects without
-calling an external LLM:
-
-```bash
-PYTHONPATH=/tmp/codex-crewai-050 python3 \
-  ai_agents/crewai_hpc/hpc_crewai.py --instantiate-proof \
-  --output ai_agents/crewai_hpc/crewai_instantiation_proof.md
-```
-
-Show during review:
-
-- this directory,
-- the source file `hpc_crewai.py`,
-- the generated `crewai_hpc_evidence.md`,
-- the generated `crewai_instantiation_proof.md` if available,
-- the terminal commands used to run it.
