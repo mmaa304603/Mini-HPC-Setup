@@ -1,0 +1,26 @@
+---
+setup_schema_version: "{{ setup_main_defaults.schema_version }}"
+setup_log_dir: "{{ setup_main_defaults.log_dir }}"
+setup_config_dir: "{{ setup_main_defaults.config_dir }}"
+setup_complete_flag: "{{ setup_main_defaults.complete_flag }}"
+setup_force: "{{ setup_main_defaults.force }}"
+setup_legacy_complete_flags: "{{ setup_main_defaults.legacy_complete_flags }}"
+
+setup_enable_epel: "{{ setup_package_defaults.enable_epel }}"
+setup_packages: "{{ setup_package_defaults.packages }}"
+
+setup_required_distribution: "{{ setup_system_defaults.required_distribution }}"
+setup_required_rocky_major_version: "{{ setup_system_defaults.required_rocky_major_version }}"
+setup_admin_group: "{{ setup_system_defaults.admin_group }}"
+setup_user_group: "{{ setup_system_defaults.user_group }}"
+setup_admin_user: "{{ setup_system_defaults.admin_user }}"
+setup_service_users: "{{ setup_system_defaults.service_users }}"
+
+setup_network_interface: "{{ setup_system_defaults.network_interface }}"
+setup_network_connection_name: "{{ setup_system_defaults.network_connection_name }}"
+setup_network_address: "{{ setup_system_defaults.network_address }}"
+setup_network_prefix: "{{ setup_system_defaults.network_prefix }}"
+setup_network_gateway: "{{ setup_system_defaults.network_gateway }}"
+setup_network_dns: "{{ setup_system_defaults.network_dns }}"
+
+setup_security: "{{ setup_security_defaults }}"

@@ -1,0 +1,24 @@
+---
+# Elasticsearch configuration
+elasticsearch_heap_size: "2g"
+elasticsearch_user: "elastic"
+elasticsearch_password: "changeme"  # Change this in production!
+
+# Logstash configuration
+logstash_pipeline_workers: 2
+logstash_batch_size: 125
+logstash_batch_delay: 50
+
+# Kibana configuration
+kibana_port: 5601
+kibana_host: "0.0.0.0"
+
+# Filebeat configuration (for client nodes)
+filebeat_enabled: true
+filebeat_config:
+  - type: "system"
+    enabled: true
+  - type: "slurm"
+    enabled: true
+  - type: "spack"
+    enabled: true 

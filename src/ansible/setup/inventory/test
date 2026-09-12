@@ -1,0 +1,8 @@
+[test]
+localhost ansible_connection=local
+
+[all:vars]
+setup_become=false
+setup_validation_enforce=false
+setup_require_root=false
+setup_network_interface=lo

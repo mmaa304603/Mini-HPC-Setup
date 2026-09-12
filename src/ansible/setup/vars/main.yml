@@ -1,0 +1,11 @@
+---
+# These are low-precedence defaults. Roles expose the individual setup_*
+# variables, allowing inventory host variables and -e values to override them.
+setup_main_defaults:
+  schema_version: 1
+  log_dir: /var/log/hpc-setup
+  config_dir: /etc/hpc-setup
+  complete_flag: /var/log/hpc-setup/checkpoints/setup_complete
+  force: false
+  legacy_complete_flags:
+    - /var/log/hpc-setup/setup_complete

@@ -1,46 +1,37 @@
 ---
-# System Configuration Variables
+setup_system_defaults:
+  required_distribution: Rocky
+  required_rocky_major_version: "9"
 
-# System Paths
-setup_complete_flag: /var/log/hpc-setup/setup_complete
-log_dir: /var/log/hpc-setup
-config_dir: /etc/hpc-setup
+  # Minimums currently used by src/shell/config/config.conf.
+  min_disk_space_gb: 4
+  min_memory_gb: 1
+  min_cpu_cores: 1
 
-# Package Management
-package_manager: dnf  # or yum for older systems
-enable_epel: true
-enable_powertools: true
+  network_interface: enp0s8
+  bootstrap_commands:
+    - dnf
+    - systemctl
+    - ip
+    - df
+    - free
+    - nproc
 
-# User Management
-admin_group: hpc-admin
-user_group: hpc-users
-slurm_user: slurm
-munge_user: munge
+  admin_group: hpc-admin
+  user_group: hpc-users
+  admin_user: "{{ lookup('ansible.builtin.env', 'SUDO_USER') or lookup('ansible.builtin.env', 'USER') }}"
+  service_users:
+    - name: slurm
+      group: slurm
+      uid: 960
+      gid: 968
+    - name: munge
+      group: munge
+      uid: 959
+      gid: 967
 
-# Network Configuration
-cluster_network: 10.0.0.0/24
-management_network: 192.168.1.0/24
-storage_network: 172.16.0.0/24
-
-# Security Settings
-firewall_service: firewalld
-selinux_state: enforcing
-min_password_length: 12
-password_max_days: 90
-failed_login_attempts: 5
-ssh_port: 22
-allowed_ssh_groups: ['hpc-admin']
-
-# System Requirements
-min_cpu_cores: 2
-min_memory_gb: 4
-min_root_disk_gb: 20
-required_packages:
-  - epel-release
-  - wget
-  - git
-  - vim
-  - tmux
-  - htop
-  - nfs-utils
-  - chrony 
+  network_connection_name: cluster-internal
+  network_address: 10.0.0.1
+  network_prefix: 22
+  network_gateway: ""
+  network_dns: []

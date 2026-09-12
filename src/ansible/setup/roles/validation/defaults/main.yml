@@ -1,0 +1,10 @@
+---
+setup_validation_enforce: true
+setup_require_root: true
+setup_required_distribution: "{{ setup_system_defaults.required_distribution }}"
+setup_required_rocky_major_version: "{{ setup_system_defaults.required_rocky_major_version }}"
+setup_min_disk_space_gb: "{{ setup_system_defaults.min_disk_space_gb }}"
+setup_min_memory_gb: "{{ setup_system_defaults.min_memory_gb }}"
+setup_min_cpu_cores: "{{ setup_system_defaults.min_cpu_cores }}"
+setup_network_interface: "{{ setup_system_defaults.network_interface }}"
+setup_bootstrap_commands: "{{ setup_system_defaults.bootstrap_commands }}"

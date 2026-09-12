@@ -1,0 +1,10 @@
+---
+- name: restart globus
+  systemd:
+    name: globus-connect-server
+    state: restarted
+
+- name: reload firewalld
+  systemd:
+    name: firewalld
+    state: reloaded 

@@ -1,0 +1,27 @@
+[sssd]
+config_file_version = 2
+services = nss, pam
+domains = ttu.edu
+
+[domain/ttu.edu]
+id_provider = ldap
+auth_provider = ldap
+chpass_provider = ldap
+access_provider = ldap
+ldap_uri = ldaps://ldap.ttu.edu
+ldap_search_base = dc=ttu,dc=edu
+ldap_id_use_start_tls = True
+ldap_tls_cacertdir = /etc/openldap/cacerts
+ldap_tls_reqcert = demand
+ldap_schema = rfc2307bis
+ldap_user_object_class = person
+ldap_user_name = uid
+ldap_user_uid_number = uidNumber
+ldap_user_gid_number = gidNumber
+ldap_user_home_directory = homeDirectory
+ldap_user_shell = loginShell
+ldap_group_object_class = posixGroup
+ldap_group_name = cn
+ldap_group_gid_number = gidNumber
+cache_credentials = True
+enumerate = True 

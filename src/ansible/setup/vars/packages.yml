@@ -1,0 +1,16 @@
+---
+setup_package_defaults:
+  enable_epel: true
+  packages:
+    - wget
+    - git
+    - vim-enhanced
+    - tmux
+    - htop
+    - nfs-utils
+    - NetworkManager
+    - chrony
+    - firewalld
+    - audit
+    - policycoreutils
+    - python3-libselinux

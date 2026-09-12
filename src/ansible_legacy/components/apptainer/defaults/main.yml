@@ -1,0 +1,40 @@
+---
+# Apptainer version
+apptainer_version: "1.2.5"
+
+# Configuration directories
+apptainer_config_dir: "/etc/apptainer"
+apptainer_cache_dir: "/var/cache/apptainer"
+apptainer_sysconfig: "/etc/sysconfig/apptainer"
+
+# Bind paths
+apptainer_bind_paths:
+  - "/scratch"
+  - "/work"
+  - "/home"
+
+# Features
+apptainer_enable_overlay: true
+apptainer_enable_nv: true
+apptainer_enable_rocm: true
+apptainer_allow_fusemount: true
+
+# MPI configuration
+apptainer_mpi_config:
+  openmpi:
+    prefix: "/usr/lib64/openmpi"
+    modulefile: "/etc/modulefiles/mpi/openmpi"
+  mpich:
+    prefix: "/usr/lib64/mpich"
+    modulefile: "/etc/modulefiles/mpi/mpich"
+
+# Resource limits
+apptainer_limit_container_groups: 65536
+apptainer_limit_container_owners: "@wheel"
+
+# Example recipes
+apptainer_example_recipes:
+  - name: "openmpi"
+    enabled: true
+  - name: "cuda"
+    enabled: true 

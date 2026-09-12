@@ -1,35 +1,76 @@
 ---
-- name: Initial System Setup
+- name: Initialize the HPC head node
   hosts: all
-  become: true
-  
+  become: "{{ setup_become | default(true) | bool }}"
+  gather_facts: false
+  vars_files:
+    - ../vars/main.yml
+    - ../vars/system.yml
+    - ../vars/packages.yml
+    - ../vars/security.yml
+
   pre_tasks:
-    - name: Load system variables
-      include_vars:
-        file: ../vars/system.yml
-        
-    - name: Check system requirements
-      include_role:
-        name: core/roles/common
-        tasks_from: check_requirements.yml
+    - name: Inspect the setup completion flag
+      ansible.builtin.stat:
+        path: "{{ setup_complete_flag }}"
+      register: setup_completion_flag_state
+
+    - name: Report an already completed setup
+      ansible.builtin.debug:
+        msg: >-
+          Setup is already complete according to {{ setup_complete_flag }}.
+          No setup tasks will run. Set setup_force=true to reconcile the host.
+      when:
+        - setup_completion_flag_state.stat.isreg | default(false)
+        - not setup_force | bool
+
+    - name: Stop processing an already completed host
+      ansible.builtin.meta: end_host
+      when:
+        - setup_completion_flag_state.stat.isreg | default(false)
+        - not setup_force | bool
+
+    - name: Remove current and legacy completion flags before setup
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop: "{{ ([setup_complete_flag] + setup_legacy_complete_flags) | unique | list }}"
+      when: not ansible_check_mode
+
+    - name: Gather system facts
+      ansible.builtin.setup:
+
+    - name: Validate the setup environment
+      ansible.builtin.import_role:
+        name: validation
 
   roles:
-    - role: setup/roles/packages
-      tags: ['packages', 'init']
-      
-    - role: setup/roles/users
-      tags: ['users', 'init']
-      
-    - role: setup/roles/security
-      tags: ['security', 'init']
-      
-    - role: setup/roles/network
-      tags: ['network', 'init']
+    - role: bootstrap
+    - role: security
+    - role: network
+    - role: config
 
   post_tasks:
-    - name: Create setup completion flag
-      file:
-        path: "{{ setup_complete_flag }}"
-        state: touch
-        mode: '0644'
-      when: not ansible_check_mode 
+    - name: Run pending setup handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify the completed setup
+      ansible.builtin.include_role:
+        name: verify
+      when: not ansible_check_mode
+
+    - name: Read the verified completion time
+      ansible.builtin.command:
+        argv: [date, --utc, +%Y-%m-%dT%H:%M:%SZ]
+      register: setup_completion_time
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Write setup completion flag
+      ansible.builtin.copy:
+        content: "{{ setup_completion_time.stdout }}\n"
+        dest: "{{ setup_complete_flag }}"
+        owner: root
+        group: root
+        mode: "0644"
+      when: not ansible_check_mode

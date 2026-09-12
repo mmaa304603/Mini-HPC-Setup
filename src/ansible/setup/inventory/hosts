@@ -1,0 +1,5 @@
+[headnode]
+localhost ansible_connection=local
+
+[all:vars]
+setup_become=true

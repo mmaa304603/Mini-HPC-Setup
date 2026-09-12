@@ -1,0 +1,13 @@
+---
+- name: restart warewulfd
+  systemd:
+    name: warewulfd
+    state: restarted
+
+- name: reload firewalld
+  systemd:
+    name: firewalld
+    state: reloaded
+
+- name: build vnfs
+  command: wwctl vnfs build rocky9 

@@ -1,0 +1,35 @@
+input {
+  beats {
+    port => 5044
+  }
+  tcp {
+    port => 5000
+  }
+  syslog {
+    port => 5140
+  }
+}
+
+filter {
+  if [type] == "syslog" {
+    grok {
+      match => { "message" => "%{SYSLOGBASE} %{GREEDYDATA:syslog_message}" }
+    }
+  }
+  
+  if [type] == "slurm" {
+    grok {
+      match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{WORD:component} %{GREEDYDATA:slurm_message}" }
+    }
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["localhost:9200"]
+    index => "logstash-%{+YYYY.MM.dd}"
+    user => "{{ elasticsearch_user }}"
+    password => "{{ elasticsearch_password }}"
+  }
+  stdout { codec => rubydebug }
+} 

@@ -1,0 +1,30 @@
+# Apptainer configuration file
+
+# Allow containers to use bind mounts
+mount devpts = yes
+mount proc = yes
+mount sys = yes
+mount home = yes
+mount tmp = yes
+mount hostfs = yes
+mount scratch = yes
+
+# Enable overlay fs for better performance
+enable overlay = {% if apptainer_enable_overlay %}yes{% else %}no{% endif %}
+
+# Allow use of NVIDIA GPUs
+enable nv = {% if apptainer_enable_nv %}yes{% else %}no{% endif %}
+
+# Allow use of Rocm/AMD GPUs
+enable rocm = {% if apptainer_enable_rocm %}yes{% else %}no{% endif %}
+
+# Network configuration
+allow net = yes
+allow network = yes
+
+# MPI configuration
+mpi config file = {{ apptainer_config_dir }}/mpi.conf
+
+# Limit container resources
+limit container groups = {{ apptainer_limit_container_groups }}
+limit container owners = {{ apptainer_limit_container_owners }} 

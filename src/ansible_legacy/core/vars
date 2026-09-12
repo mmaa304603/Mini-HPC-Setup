@@ -1,0 +1,112 @@
+---
+# Network Configuration
+network_interface: "enp2s0"
+head_node_ip: "10.0.0.1"
+network_mask: "255.255.252.0"
+network: "10.0.0.0"
+dhcp_start: "10.0.1.1"
+dhcp_end: "10.0.1.255"
+
+# Firewall Configuration
+firewall_enabled: true
+firewall_services:
+  - dhcp
+  - tftp
+  - nfs
+  - http
+  - https
+firewall_ports:
+  - 9873  # Warewulf port
+  - 6817  # SLURM port
+  - 6818  # SLURM port
+  - 6819  # SLURM port
+
+# SLURM Configuration
+slurm_cluster_name: "hpc-cluster"
+slurm_node_count: 3
+slurm_node_prefix: "compute"
+slurm_partition_name: "normal"
+slurm_default_partition: true
+slurm_max_time: "INFINITE"
+slurm_log_dir: "/var/log/slurm"
+slurm_state_save_location: "/var/spool/slurm/state"
+slurm_accounting_enabled: true
+slurm_accounting_storage_type: "accounting_storage/slurmdbd"
+slurm_accounting_storage_host: "localhost"
+slurm_accounting_storage_user: "slurm"
+slurm_max_job_count: 10000
+slurm_max_jobs_per_user: 1000
+slurm_select_type: "select/linear"
+slurm_fast_schedule: true
+
+# Spack Configuration
+spack_root: "/opt/spack"
+spack_env_file: "/etc/profile.d/spack.sh"
+spack_packages:
+  - openmpi
+  - mpich
+  - hpl
+  - osu-micro-benchmarks
+  - stream
+  - cmake
+  - gcc
+spack_modules_enabled: true
+spack_modules_type: "lmod"
+spack_modules_refresh: true
+
+# Monitoring Configuration
+elasticsearch_enabled: true
+logstash_enabled: true
+kibana_enabled: true
+grafana_enabled: true
+filebeat_enabled: true
+elasticsearch_cluster_name: "hpc-cluster"
+elasticsearch_node_name: "headnode"
+elasticsearch_host: "0.0.0.0"
+elasticsearch_port: 9200
+logstash_beats_port: 5044
+logstash_conf_dir: "/etc/logstash/conf.d"
+kibana_port: 5601
+kibana_host: "0.0.0.0"
+kibana_elasticsearch_host: "localhost:9200"
+grafana_port: 3000
+grafana_domain: "localhost"
+grafana_admin_user: "admin"
+grafana_admin_password: "admin"
+grafana_anonymous_enabled: true
+grafana_anonymous_role: "Viewer"
+filebeat_log_paths:
+  - "/var/log/slurm/*.log"
+filebeat_log_type: "slurm"
+filebeat_logstash_host: "localhost:5044"
+
+# Squid Configuration - removed, no longer needed with spack
+# squid_enabled: true
+# squid_port: 3128
+# squid_cache_dir: "/var/spool/squid"
+# squid_cache_size: 10000
+# squid_max_object_size: 4096
+# squid_visible_hostname: "headnode"
+
+# Apptainer Configuration
+apptainer_enabled: true
+apptainer_install_dir: "/opt/apptainer"
+apptainer_cache_dir: "/opt/apptainer/cache"
+apptainer_bind_paths:
+  - "/scratch"
+  - "/opt/software"
+  - "/opt/modules"
+
+# Component enablement flags
+network_setup_enabled: true
+warewulf_enabled: true
+slurm_enabled: true
+spack_enabled: true
+monitoring_enabled: true
+squid_enabled: false  # Removed - squid no longer needed with spack
+apptainer_enabled: true
+
+# System requirements
+min_disk_space_gb: 20
+min_memory_gb: 4
+min_cpu_cores: 2 

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Environment Modules initialization script
+MODULES_HOME=/opt/modules
+export MODULEPATH=$MODULES_HOME/modulefiles
+
+# Source the module command
+if [ -f $MODULES_HOME/init/bash ]; then
+    . $MODULES_HOME/init/bash
+fi 

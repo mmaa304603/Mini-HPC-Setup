@@ -1,0 +1,9 @@
+---
+- name: Create setup directories
+  ansible.builtin.import_tasks: directories.yml
+
+- name: Install setup packages
+  ansible.builtin.import_tasks: packages.yml
+
+- name: Create setup identities
+  ansible.builtin.import_tasks: identities.yml

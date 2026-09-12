@@ -1,0 +1,11 @@
+---
+- name: Install the EPEL repository
+  ansible.builtin.dnf:
+    name: epel-release
+    state: present
+  when: setup_enable_epel | bool
+
+- name: Install setup packages
+  ansible.builtin.dnf:
+    name: "{{ setup_packages }}"
+    state: present

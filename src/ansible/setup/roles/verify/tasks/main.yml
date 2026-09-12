@@ -1,0 +1,192 @@
+---
+- name: Inspect setup paths
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ setup_log_dir }}"
+    - "{{ setup_config_dir }}"
+    - "{{ setup_complete_flag | dirname }}"
+    - "{{ setup_config_dir }}/setup.yml"
+  register: setup_required_paths
+
+- name: Verify setup path types
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - >-
+        (item.item == setup_config_dir ~ '/setup.yml' and item.stat.isreg)
+        or (item.item != setup_config_dir ~ '/setup.yml' and item.stat.isdir)
+    fail_msg: "Required setup path is missing or has the wrong type: {{ item.item }}"
+    quiet: true
+  loop: "{{ setup_required_paths.results }}"
+
+- name: Read the effective setup configuration
+  ansible.builtin.slurp:
+    src: "{{ setup_config_dir }}/setup.yml"
+  register: setup_effective_config_file
+
+- name: Parse the effective setup configuration
+  ansible.builtin.set_fact:
+    setup_effective_config: >-
+      {{ setup_effective_config_file.content | b64decode | from_yaml }}
+
+- name: Verify the setup configuration
+  ansible.builtin.assert:
+    that:
+      - setup_effective_config.schema_version | int == setup_schema_version | int
+      - setup_effective_config.network_interface == setup_network_interface
+      - setup_effective_config.network_address == setup_network_address
+      - setup_effective_config.network_prefix | int == setup_network_prefix | int
+      - setup_effective_config.service_users == setup_service_users
+    fail_msg: The effective setup configuration does not match this run.
+    quiet: true
+
+- name: Collect installed package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Verify setup packages
+  ansible.builtin.assert:
+    that: item in ansible_facts.packages
+    fail_msg: "Required setup package is missing: {{ item }}"
+    quiet: true
+  loop: >-
+    {{ setup_packages + (['epel-release'] if setup_enable_epel | bool else []) }}
+
+- name: Read local identity databases
+  ansible.builtin.getent:
+    database: "{{ item }}"
+  loop:
+    - group
+    - passwd
+
+- name: Verify base groups
+  ansible.builtin.assert:
+    that: item in ansible_facts.getent_group
+    fail_msg: "Required setup group is missing: {{ item }}"
+    quiet: true
+  loop:
+    - "{{ setup_admin_group }}"
+    - "{{ setup_user_group }}"
+
+- name: Verify service identities
+  ansible.builtin.assert:
+    that:
+      - item.group in ansible_facts.getent_group
+      - ansible_facts.getent_group[item.group][1] | int == item.gid | int
+      - item.name in ansible_facts.getent_passwd
+      - ansible_facts.getent_passwd[item.name][1] | int == item.uid | int
+      - ansible_facts.getent_passwd[item.name][2] | int == item.gid | int
+      - ansible_facts.getent_passwd[item.name][5] == '/sbin/nologin'
+    fail_msg: "Service identity {{ item.name }} does not match its setup contract."
+    quiet: true
+  loop: "{{ setup_service_users }}"
+
+- name: Read administrator group membership
+  ansible.builtin.command:
+    argv: [id, -nG, "{{ setup_admin_user }}"]
+  register: setup_verified_admin_groups
+  changed_when: false
+  when:
+    - setup_admin_user | length > 0
+    - setup_admin_user != 'root'
+
+- name: Verify administrator group membership
+  ansible.builtin.assert:
+    that: setup_admin_group in setup_verified_admin_groups.stdout.split()
+    fail_msg: "{{ setup_admin_user }} is not a member of {{ setup_admin_group }}."
+    quiet: true
+  when:
+    - setup_admin_user | length > 0
+    - setup_admin_user != 'root'
+
+- name: Collect service facts
+  ansible.builtin.service_facts:
+
+- name: Verify required services
+  ansible.builtin.assert:
+    that:
+      - item in ansible_facts.services
+      - ansible_facts.services[item].state == 'running'
+      - ansible_facts.services[item].status == 'enabled'
+    fail_msg: "Required setup service is not running and enabled: {{ item }}"
+    quiet: true
+  loop: >-
+    {{ ['chronyd.service']
+       + (['firewalld.service'] if setup_security.firewall.manage | bool else [])
+       + (['auditd.service'] if setup_security.audit.manage | bool else []) }}
+
+- name: Verify chronyd can report clock state
+  ansible.builtin.command:
+    argv: [chronyc, tracking]
+  changed_when: false
+
+- name: Read the SELinux state
+  ansible.builtin.command:
+    argv: [getenforce]
+  register: setup_verified_selinux
+  changed_when: false
+  when: setup_security.selinux.manage | bool
+
+- name: Verify the SELinux state
+  ansible.builtin.assert:
+    that: setup_verified_selinux.stdout | lower == setup_security.selinux.state
+    fail_msg: >-
+      SELinux is {{ setup_verified_selinux.stdout | default('unknown') }},
+      expected {{ setup_security.selinux.state }}.
+    quiet: true
+  when: setup_security.selinux.manage | bool
+
+- name: Inspect the managed audit rules
+  ansible.builtin.stat:
+    path: /etc/audit/rules.d/hpc-setup.rules
+  register: setup_verified_audit_rules
+  when: setup_security.audit.manage | bool
+
+- name: Verify the managed audit rules
+  ansible.builtin.assert:
+    that:
+      - setup_verified_audit_rules.stat.isreg | default(false)
+      - setup_verified_audit_rules.stat.pw_name == 'root'
+      - setup_verified_audit_rules.stat.gr_name == 'root'
+      - setup_verified_audit_rules.stat.mode == '0600'
+    fail_msg: Managed audit rules are missing or have unsafe ownership.
+    quiet: true
+  when: setup_security.audit.manage | bool
+
+- name: Verify compiled audit rules are current
+  ansible.builtin.command:
+    argv: [augenrules, --check]
+  changed_when: false
+  when: setup_security.audit.manage | bool
+
+- name: Read loaded kernel audit rules
+  ansible.builtin.command:
+    argv: [auditctl, -l]
+  changed_when: false
+  when: setup_security.audit.manage | bool
+
+- name: Verify the managed network connection
+  ansible.builtin.command:
+    argv: [nmcli, connection, show, "{{ setup_network_connection_name }}"]
+  changed_when: false
+
+- name: Read the configured network address
+  ansible.builtin.command:
+    argv: [ip, -4, address, show, dev, "{{ setup_network_interface }}"]
+  register: setup_verified_network_address
+  changed_when: false
+
+- name: Verify the configured network address
+  ansible.builtin.assert:
+    that: >-
+      setup_network_address ~ '/' ~ (setup_network_prefix | string)
+      in setup_verified_network_address.stdout
+    fail_msg: >-
+      {{ setup_network_address }}/{{ setup_network_prefix }} is not assigned to
+      {{ setup_network_interface }}.
+    quiet: true
+
+- name: Report successful setup verification
+  ansible.builtin.debug:
+    msg: All managed head-node setup state passed verification.

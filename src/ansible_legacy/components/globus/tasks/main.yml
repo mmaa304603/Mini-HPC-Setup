@@ -1,0 +1,75 @@
+---
+# Add Globus repository
+- name: Add Globus repository
+  yum_repository:
+    name: globus
+    description: Globus repository
+    baseurl: https://downloads.globus.org/toolkit/gt6/stable/rpm/el9/x86_64
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://downloads.globus.org/toolkit/gt6/stable/rpm/el9/RPM-GPG-KEY-Globus
+
+# Install Globus packages
+- name: Install Globus packages
+  dnf:
+    name:
+      - globus-connect-server
+      - globus-connect-server-io
+      - globus-connect-server-id
+      - globus-connect-server-web
+      - globus-connect-server-manager
+    state: present
+
+# Configure Globus
+- name: Create Globus configuration
+  template:
+    src: globus.conf.j2
+    dest: /etc/globus-connect-server.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart globus
+
+- name: Create storage gateway configuration
+  template:
+    src: storage-gateway.conf.j2
+    dest: /etc/globus-connect-server/storage-gateway.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart globus
+
+- name: Create mapped collections configuration
+  template:
+    src: mapped-collections.conf.j2
+    dest: /etc/globus-connect-server/mapped-collections.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart globus
+
+# Configure firewall
+- name: Allow Globus ports
+  firewalld:
+    port: "{{ item }}"
+    permanent: yes
+    state: enabled
+  loop:
+    - 443/tcp
+    - 80/tcp
+    - 2811/tcp
+    - 50000-51000/tcp
+  notify: reload firewalld
+
+# Enable and start services
+- name: Enable and start Globus services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - globus-connect-server
+    - globus-connect-server-io
+    - globus-connect-server-id
+    - globus-connect-server-web
+    - globus-connect-server-manager 

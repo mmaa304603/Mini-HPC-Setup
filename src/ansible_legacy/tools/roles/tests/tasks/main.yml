@@ -1,0 +1,54 @@
+---
+# Tests role tasks
+
+- name: Install test tools
+  dnf:
+    name:
+      - iperf3
+      - net-tools
+      - bind-utils
+    state: present
+
+- name: Run network tests
+  shell: |
+    ip addr show enp2s0
+    ip route show
+    nslookup ttu.edu
+    ping -c 4 8.8.8.8
+    firewall-cmd --list-all
+    systemctl status dhcpd
+    systemctl status tftpd
+    systemctl status nfs-server
+    netstat -tuln
+  register: network_test_results
+
+- name: Run service tests
+  shell: |
+    systemctl status warewulfd
+    wwctl node list
+    wwctl vnfs list
+    systemctl status slurmctld
+    sinfo
+    squeue
+    systemctl status sssd
+    sssctl domain-status ttu.edu
+    systemctl status globus-connect-server
+    globus-connect-server self-diagnostic
+    globus endpoint show HPC\ Cluster
+    systemctl status elasticsearch
+    systemctl status kibana
+    systemctl status grafana-server
+    # systemctl status squid  # Removed - squid no longer needed with spack
+    apptainer --version
+  register: service_test_results
+
+- name: Save test results
+  copy:
+    content: |
+      Network Test Results:
+      {{ network_test_results.stdout_lines | to_nice_json }}
+      
+      Service Test Results:
+      {{ service_test_results.stdout_lines | to_nice_json }}
+    dest: /var/log/tests/{{ ansible_date_time.date }}.log
+    mode: '0644' 

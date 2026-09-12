@@ -1,0 +1,73 @@
+---
+- name: Install EPEL repository
+  dnf:
+    name: epel-release
+    state: present
+
+- name: Add Grafana repository
+  yum_repository:
+    name: grafana
+    description: Grafana repository
+    baseurl: https://packages.grafana.com/oss/rpm
+    gpgcheck: yes
+    gpgkey: https://packages.grafana.com/gpg.key
+    enabled: yes
+
+- name: Install Grafana
+  dnf:
+    name: grafana
+    state: present
+    enablerepo: grafana
+
+- name: Configure Grafana
+  template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+    mode: '0644'
+  notify: restart grafana
+
+- name: Configure Grafana datasources
+  template:
+    src: datasources.yaml.j2
+    dest: /etc/grafana/provisioning/datasources/datasources.yaml
+    mode: '0644'
+  notify: restart grafana
+
+- name: Configure Grafana dashboards
+  template:
+    src: dashboards.yaml.j2
+    dest: /etc/grafana/provisioning/dashboards/dashboards.yaml
+    mode: '0644'
+  notify: restart grafana
+
+- name: Copy HPC dashboard
+  template:
+    src: hpc-dashboard.json.j2
+    dest: /var/lib/grafana/dashboards/hpc-dashboard.json
+    mode: '0644'
+  notify: restart grafana
+
+- name: Enable and start Grafana service
+  systemd:
+    name: grafana-server
+    state: started
+    enabled: yes
+
+- name: Wait for Grafana to be ready
+  uri:
+    url: "http://localhost:3000/api/health"
+    method: GET
+    status_code: 200
+  register: result
+  until: result.status == 200
+  retries: 30
+  delay: 10
+
+- name: Create admin user
+  uri:
+    url: "http://localhost:3000/api/admin/users"
+    method: POST
+    body: '{"email":"{{ grafana_admin_user }}","login":"{{ grafana_admin_user }}","password":"{{ grafana_admin_password }}"}' 
+    body_format: json
+    status_code: [200, 412]
+  when: result.status == 200 

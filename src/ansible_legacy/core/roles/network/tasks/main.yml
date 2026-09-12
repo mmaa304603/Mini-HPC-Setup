@@ -1,0 +1,37 @@
+---
+- name: Verify required network variables
+  ansible.builtin.assert:
+    that:
+      - vars[item] is defined
+      - vars[item] | string | length > 0
+    fail_msg: "Required network variable '{{ item }}' is missing or empty."
+    quiet: true
+  loop: "{{ network_required_variables }}"
+
+- name: Verify network address formats
+  ansible.builtin.assert:
+    that:
+      - external_ip is match(network_ipv4_pattern)
+      - internal_ip is match(network_ipv4_pattern)
+      - cluster_network is match(network_ipv4_pattern)
+      - cluster_prefix | int >= 1
+      - cluster_prefix | int <= 32
+    fail_msg: "The configured network addresses or prefix are invalid."
+
+- name: Verify external IP is assigned
+  ansible.builtin.assert:
+    that:
+      - external_ip in ansible_all_ipv4_addresses
+    fail_msg: >-
+      External IP {{ external_ip }} is not assigned.
+      Current addresses: {{ ansible_all_ipv4_addresses | join(', ') }}.
+
+- name: Check required network commands
+  ansible.builtin.command:
+    cmd: "command -v {{ item }}"
+  args:
+    executable: /bin/bash
+  changed_when: false
+  loop:
+    - nmcli
+    - firewall-cmd

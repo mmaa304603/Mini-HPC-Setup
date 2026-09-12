@@ -1,0 +1,46 @@
+---
+# Server configuration
+globus_server_name: "HPC Cluster"
+globus_organization: "Texas Tech University"
+globus_contact_email: "hpc-admin@ttu.edu"
+globus_https_port: 443
+globus_http_port: 80
+globus_ip_address: "10.0.0.1"
+globus_gridftp_port: 2811
+globus_data_port_range: "50000-51000"
+globus_control_port_range: "50000-51000"
+globus_restrict_paths: "/home,/scratch,/opt"
+
+# Security settings
+globus_allow_anonymous: false
+globus_require_encryption: true
+globus_require_strong_auth: true
+globus_require_strong_enc: true
+globus_require_integrity: true
+globus_require_mutual_auth: true
+globus_require_client_auth: true
+globus_require_server_auth: true
+globus_require_client_authz: true
+globus_require_server_authz: true
+globus_require_client_enc: true
+globus_require_server_enc: true
+globus_require_client_integrity: true
+globus_require_server_integrity: true
+globus_require_client_mutual_auth: true
+globus_require_server_mutual_auth: true
+
+# Storage gateway configuration
+globus_storage_name: "HPC Storage"
+globus_storage_type: "POSIX"
+globus_storage_root: "/home"
+globus_storage_path: "/home"
+globus_storage_permissions: "rw"
+globus_storage_anonymous: false
+
+# Mapped collections configuration
+globus_collection_name: "HPC Home Directories"
+globus_collection_type: "mapped"
+globus_collection_gateway: "HPC Storage"
+globus_collection_path: "/home"
+globus_collection_permissions: "rw"
+globus_collection_anonymous: false 

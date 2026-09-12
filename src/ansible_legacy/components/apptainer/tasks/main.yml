@@ -1,0 +1,120 @@
+---
+# Install development tools
+- name: Install development tools
+  dnf:
+    name: "@Development Tools"
+    state: present
+
+# Install dependencies
+- name: Install Apptainer dependencies
+  dnf:
+    name:
+      - openssl-devel
+      - libuuid-devel
+      - libseccomp-devel
+      - wget
+      - squashfs-tools
+      - cryptsetup
+      - golang
+      - git
+    state: present
+
+# Download Apptainer source
+- name: Download Apptainer source
+  get_url:
+    url: "https://github.com/apptainer/apptainer/releases/download/v{{ apptainer_version }}/apptainer-{{ apptainer_version }}.tar.gz"
+    dest: "/tmp/apptainer-{{ apptainer_version }}.tar.gz"
+    mode: '0644'
+
+# Extract Apptainer source
+- name: Extract Apptainer source
+  unarchive:
+    src: "/tmp/apptainer-{{ apptainer_version }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+# Build and install Apptainer
+- name: Configure Apptainer
+  command: ./mconfig
+  args:
+    chdir: "/tmp/apptainer-{{ apptainer_version }}"
+  changed_when: false
+
+- name: Build Apptainer
+  command: make -C builddir
+  args:
+    chdir: "/tmp/apptainer-{{ apptainer_version }}"
+
+- name: Install Apptainer
+  command: make -C builddir install
+  args:
+    chdir: "/tmp/apptainer-{{ apptainer_version }}"
+
+# Create configuration directories
+- name: Create Apptainer configuration directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - "{{ apptainer_config_dir }}"
+    - "{{ apptainer_cache_dir }}"
+
+# Create Apptainer configuration
+- name: Create Apptainer main configuration
+  template:
+    src: apptainer.conf.j2
+    dest: "{{ apptainer_config_dir }}/apptainer.conf"
+    mode: '0644'
+
+# Create MPI configuration
+- name: Create MPI configuration
+  template:
+    src: mpi.conf.j2
+    dest: "{{ apptainer_config_dir }}/mpi.conf"
+    mode: '0644'
+
+# Create system configuration
+- name: Create system configuration
+  template:
+    src: sysconfig.j2
+    dest: "{{ apptainer_sysconfig }}"
+    mode: '0644'
+
+# Create environment module file
+- name: Create modulefiles directory
+  file:
+    path: /etc/modulefiles/container
+    state: directory
+    mode: '0755'
+
+- name: Create Apptainer module file
+  template:
+    src: apptainer.module.j2
+    dest: /etc/modulefiles/container/apptainer
+    mode: '0644'
+
+# Create example recipes
+- name: Create example recipes directory
+  file:
+    path: /usr/local/share/apptainer/examples
+    state: directory
+    mode: '0755'
+
+- name: Create OpenMPI example recipe
+  template:
+    src: openmpi.def.j2
+    dest: /usr/local/share/apptainer/examples/openmpi.def
+    mode: '0644'
+
+- name: Create CUDA example recipe
+  template:
+    src: cuda.def.j2
+    dest: /usr/local/share/apptainer/examples/cuda.def
+    mode: '0644'
+
+# Clean up
+- name: Clean up temporary files
+  file:
+    path: "/tmp/apptainer-{{ apptainer_version }}"
+    state: absent 

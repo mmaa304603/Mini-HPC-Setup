@@ -1,0 +1,43 @@
+---
+- name: Validate security configuration
+  ansible.builtin.assert:
+    that:
+      - setup_security.selinux.state in ['enforcing', 'permissive']
+      - setup_security.audit.rules is sequence
+      - setup_security.audit.rules is not string
+    fail_msg: Security configuration is invalid.
+
+- name: Ensure firewalld is enabled and running
+  ansible.builtin.service:
+    name: firewalld
+    state: started
+    enabled: true
+  when: setup_security.firewall.manage | bool
+
+- name: Configure SELinux
+  ansible.posix.selinux:
+    policy: targeted
+    state: "{{ setup_security.selinux.state }}"
+  when: setup_security.selinux.manage | bool
+
+- name: Install managed audit rules
+  ansible.builtin.copy:
+    content: "{{ setup_security.audit.rules | join('\n') }}\n"
+    dest: /etc/audit/rules.d/hpc-setup.rules
+    owner: root
+    group: root
+    mode: "0600"
+  when: setup_security.audit.manage | bool
+
+- name: Ensure auditd is enabled and running
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: true
+  when: setup_security.audit.manage | bool
+
+- name: Load managed audit rules
+  ansible.builtin.command:
+    argv: [augenrules, --load]
+  changed_when: false
+  when: setup_security.audit.manage | bool

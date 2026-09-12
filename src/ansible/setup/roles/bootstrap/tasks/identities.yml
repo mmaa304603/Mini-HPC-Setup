@@ -1,0 +1,73 @@
+---
+- name: Create HPC administration and user groups
+  ansible.builtin.group:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - "{{ setup_admin_group }}"
+    - "{{ setup_user_group }}"
+
+- name: Read existing groups
+  ansible.builtin.getent:
+    database: group
+
+- name: Read existing users
+  ansible.builtin.getent:
+    database: passwd
+
+- name: Validate target service identity IDs
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.gid | string not in
+        (ansible_facts.getent_group.values() | map(attribute=1) | list) or
+        (item.group in ansible_facts.getent_group and
+         ansible_facts.getent_group[item.group][1] | int == item.gid | int)
+      - >-
+        item.uid | string not in
+        (ansible_facts.getent_passwd.values() | map(attribute=1) | list) or
+        (item.name in ansible_facts.getent_passwd and
+         ansible_facts.getent_passwd[item.name][1] | int == item.uid | int)
+    fail_msg: >-
+      The target UID/GID for {{ item.name }} is assigned to another identity.
+      Free that numeric ID or choose a different cluster-wide reservation.
+    quiet: true
+  loop: "{{ setup_service_users }}"
+
+- name: Create service groups
+  ansible.builtin.group:
+    name: "{{ item.group }}"
+    gid: "{{ item.gid }}"
+    system: true
+    state: present
+  loop: "{{ setup_service_users }}"
+
+- name: Create service users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    group: "{{ item.group }}"
+    uid: "{{ item.uid }}"
+    system: true
+    create_home: false
+    shell: /sbin/nologin
+    state: present
+  loop: "{{ setup_service_users }}"
+
+- name: Require the invoking administrator account
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ setup_admin_user }}"
+    fail_key: true
+  when:
+    - setup_admin_user | length > 0
+    - setup_admin_user != 'root'
+
+- name: Add the invoking user to the HPC administration group
+  ansible.builtin.user:
+    name: "{{ setup_admin_user }}"
+    groups:
+      - "{{ setup_admin_group }}"
+    append: true
+  when:
+    - setup_admin_user | length > 0
+    - setup_admin_user != 'root'

@@ -1,0 +1,164 @@
+---
+- name: Initialize validation results
+  ansible.builtin.set_fact:
+    setup_validation_failures: []
+
+- name: Record a non-root execution failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + ['Setup must run as root (or with become).'] }}
+  when:
+    - setup_require_root | bool
+    - ansible_user_uid | int != 0
+
+- name: Record an unsupported distribution failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Distribution must be ' ~ setup_required_distribution ~
+        ', found ' ~ ansible_distribution ~ '.'
+      ] }}
+  when: ansible_distribution != setup_required_distribution
+
+- name: Record an unsupported major version failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        setup_required_distribution ~ ' major version must be ' ~
+        setup_required_rocky_major_version ~ ', found ' ~
+        ansible_distribution_version ~ '.'
+      ] }}
+  when:
+    - ansible_distribution == setup_required_distribution
+    - ansible_distribution_major_version != setup_required_rocky_major_version
+
+- name: Check bootstrap commands
+  ansible.builtin.shell: "command -v -- {{ item | quote }}"
+  args:
+    executable: /bin/bash
+  loop: "{{ setup_bootstrap_commands }}"
+  register: setup_command_checks
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Collect missing bootstrap commands
+  ansible.builtin.set_fact:
+    setup_missing_commands: >-
+      {{ setup_command_checks.results
+         | rejectattr('rc', 'equalto', 0)
+         | map(attribute='item') | list }}
+
+- name: Record missing bootstrap commands
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Missing bootstrap commands: ' ~ (setup_missing_commands | join(', ')) ~ '.'
+      ] }}
+  when: setup_missing_commands | length > 0
+
+- name: Check the configured network interface
+  ansible.builtin.command:
+    argv: [ip, link, show, "{{ setup_network_interface }}"]
+  register: setup_interface_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Record a missing network interface failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Network interface ' ~ setup_network_interface ~ ' was not found.'
+      ] }}
+  when: setup_interface_check.rc != 0
+
+- name: Read the default route
+  ansible.builtin.command:
+    argv: [ip, -4, route, show, default]
+  register: setup_default_route
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Resolve the default-route interface
+  ansible.builtin.set_fact:
+    setup_default_route_interface: >-
+      {{ setup_default_route.stdout
+         | regex_findall('(?:^|\\s)dev\\s+(\\S+)')
+         | first | default('') }}
+
+- name: Record an unsafe network-interface failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Refusing to configure ' ~ setup_network_interface ~
+        ' because it carries the default route. Select the dedicated cluster NIC.'
+      ] }}
+  when:
+    - not ansible_check_mode
+    - setup_default_route_interface | length > 0
+    - setup_default_route_interface == setup_network_interface
+
+- name: Read available root filesystem space
+  ansible.builtin.command:
+    argv: [df, -BG, --output=avail, /]
+  register: setup_disk_check
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Resolve available resources
+  ansible.builtin.set_fact:
+    setup_available_disk_gb: >-
+      {{ (setup_disk_check.stdout_lines | default([]) | last | default('0'))
+         | regex_replace('[^0-9]', '') | int }}
+    setup_total_memory_gb: "{{ (ansible_memtotal_mb | int / 1024) | round(0, 'floor') | int }}"
+    setup_cpu_count: "{{ ansible_processor_vcpus | int }}"
+
+- name: Record an insufficient disk space failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Insufficient disk space. Required: ' ~ setup_min_disk_space_gb ~
+        'GB, available: ' ~ setup_available_disk_gb ~ 'GB.'
+      ] }}
+  when: setup_disk_check.rc != 0 or setup_available_disk_gb | int < setup_min_disk_space_gb | int
+
+- name: Record an insufficient memory failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Insufficient memory. Required: ' ~ setup_min_memory_gb ~
+        'GB, available: ' ~ setup_total_memory_gb ~ 'GB.'
+      ] }}
+  when: setup_total_memory_gb | int < setup_min_memory_gb | int
+
+- name: Record an insufficient CPU count failure
+  ansible.builtin.set_fact:
+    setup_validation_failures: >-
+      {{ setup_validation_failures + [
+        'Insufficient CPU cores. Required: ' ~ setup_min_cpu_cores ~
+        ', available: ' ~ setup_cpu_count ~ '.'
+      ] }}
+  when: setup_cpu_count | int < setup_min_cpu_cores | int
+
+- name: Display validation failures
+  ansible.builtin.debug:
+    msg: "{{ item }}"
+  loop: "{{ setup_validation_failures }}"
+  when: setup_validation_failures | length > 0
+
+- name: Enforce environment validation
+  ansible.builtin.assert:
+    that: setup_validation_failures | length == 0
+    fail_msg: Environment validation failed. Fix every reported issue and try again.
+    success_msg: Environment validation passed.
+  when: setup_validation_enforce | bool
+
+- name: Report non-enforcing validation result
+  ansible.builtin.debug:
+    msg: >-
+      Validation enforcement is disabled; {{ setup_validation_failures | length }}
+      finding(s) were reported.
+  when: not setup_validation_enforce | bool

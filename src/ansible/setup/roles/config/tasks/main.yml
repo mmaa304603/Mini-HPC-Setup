@@ -1,0 +1,38 @@
+---
+- name: Ensure the setup configuration directory exists
+  ansible.builtin.file:
+    path: "{{ setup_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure chronyd is enabled and running
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: Write the effective setup configuration
+  ansible.builtin.copy:
+    content: |
+      {{ {
+        'schema_version': setup_schema_version,
+        'required_distribution': setup_required_distribution,
+        'required_rocky_major_version': setup_required_rocky_major_version,
+        'network_interface': setup_network_interface,
+        'network_address': setup_network_address,
+        'network_prefix': setup_network_prefix,
+        'network_gateway': setup_network_gateway,
+        'network_dns': setup_network_dns,
+        'admin_group': setup_admin_group,
+        'admin_user': setup_admin_user,
+        'user_group': setup_user_group,
+        'service_users': setup_service_users,
+        'packages': setup_packages,
+        'security': setup_security
+      } | to_nice_yaml }}
+    dest: "{{ setup_config_dir }}/setup.yml"
+    owner: root
+    group: root
+    mode: "0644"

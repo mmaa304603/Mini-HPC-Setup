@@ -1,0 +1,19 @@
+#%Module1.0
+proc ModulesHelp { } {
+    puts stderr "This module loads Apptainer container runtime"
+    puts stderr "Version {{ apptainer_version }}"
+}
+
+module-whatis "Loads Apptainer container runtime"
+
+# Dependencies
+prereq mpi
+
+# Environment setup
+setenv APPTAINER_VERSION "{{ apptainer_version }}"
+setenv APPTAINER_CACHEDIR "{{ apptainer_cache_dir }}"
+setenv APPTAINER_BINDPATH "{{ apptainer_bind_paths | join(',') }}"
+
+# Add to path
+prepend-path PATH "/usr/local/bin"
+prepend-path MANPATH "/usr/local/share/man" 

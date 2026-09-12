@@ -1,0 +1,8 @@
+---
+# SSSD configuration
+sssd_domain: ttu.edu
+sssd_ldap_uri: ldaps://ldap.ttu.edu
+sssd_ldap_search_base: dc=ttu,dc=edu
+sssd_ldap_tls_cacertdir: /etc/openldap/cacerts
+sssd_cache_credentials: true
+sssd_enumerate: true 

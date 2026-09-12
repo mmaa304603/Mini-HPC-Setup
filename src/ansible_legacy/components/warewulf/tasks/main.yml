@@ -1,0 +1,123 @@
+---
+# Add Warewulf repository
+- name: Add Warewulf repository
+  yum_repository:
+    name: warewulf
+    description: Warewulf repository
+    baseurl: https://warewulf.org/releases/el/9/x86_64
+    enabled: yes
+    gpgcheck: no
+
+# Install Warewulf packages
+- name: Install Warewulf packages
+  dnf:
+    name:
+      - warewulf4
+      - warewulf4-client
+      - warewulf4-common
+      - warewulf4-provision
+      - warewulf4-vnfs
+      - warewulf4-ipmi
+      - warewulf4-overlay
+      - warewulf4-warewulfd
+    state: present
+
+# Configure Warewulf
+- name: Create Warewulf configuration
+  template:
+    src: warewulf.conf.j2
+    dest: /etc/warewulf/warewulf.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart warewulfd
+
+- name: Create node configuration
+  template:
+    src: nodes.conf.j2
+    dest: /etc/warewulf/nodes.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart warewulfd
+
+- name: Create VNFS configuration
+  template:
+    src: vnfs.conf.j2
+    dest: /etc/warewulf/vnfs.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart warewulfd
+
+# Create overlay directory
+- name: Create overlay directory
+  file:
+    path: /etc/warewulf/overlays/rocky9
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+# Create VNFS image
+- name: Create VNFS directory
+  file:
+    path: /var/lib/warewulf/vnfs/rocky9
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create base VNFS image
+  command: wwctl vnfs create rocky9 --root /var/lib/warewulf/vnfs/rocky9
+  args:
+    creates: /var/lib/warewulf/vnfs/rocky9/rootfs
+
+- name: Add packages to VNFS
+  command: wwctl vnfs add-packages rocky9 --packages "base-minimal openssh-server openssh-clients nfs-utils slurm slurm-slurmd"
+  notify: build vnfs
+
+# Configure firewall
+- name: Allow Warewulf port
+  firewalld:
+    port: 9873/tcp
+    permanent: yes
+    state: enabled
+  notify: reload firewalld
+
+- name: Allow DHCP service
+  firewalld:
+    service: dhcp
+    permanent: yes
+    state: enabled
+  notify: reload firewalld
+
+- name: Allow TFTP service
+  firewalld:
+    service: tftp
+    permanent: yes
+    state: enabled
+  notify: reload firewalld
+
+- name: Allow NFS services
+  firewalld:
+    service: "{{ item }}"
+    permanent: yes
+    state: enabled
+  loop:
+    - nfs
+    - mountd
+    - rpc-bind
+  notify: reload firewalld
+
+# Enable and start services
+- name: Enable and start services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - warewulfd
+    - dhcpd
+    - tftp
+    - nfs-server 

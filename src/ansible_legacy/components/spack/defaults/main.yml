@@ -1,0 +1,49 @@
+---
+# Default variables for Spack installation and configuration
+
+# Spack version to install
+spack_version: "v0.23.1"
+
+# Spack installation directory
+spack_install_dir: "/opt/spack"
+
+# Spack configuration directory
+spack_config_dir: "/etc/spack"
+
+# Spack repository URL
+spack_repo: "https://github.com/spack/spack.git"
+
+# Build configuration
+spack_build_jobs: 8
+spack_build_language: "C"
+
+# Module configuration
+spack_module_roots:
+  tcl: "{{ spack_install_dir }}/modules/tcl"
+  lmod: "{{ spack_install_dir }}/modules/lmod"
+
+# Cache configuration
+spack_source_cache: "{{ spack_install_dir }}/sources"
+spack_misc_cache: "{{ spack_install_dir }}/cache"
+spack_build_stage: "/tmp/spack-stage"
+
+# Installation path scheme
+spack_install_path_scheme: "{name}/{version}-{compiler.name}-{compiler.version}/{hash}"
+
+# System compilers to add to Spack
+spack_compilers:
+  - /usr/bin/gcc
+  - /usr/bin/g++
+  - /usr/bin/gfortran
+
+# Default packages to install
+spack_packages:
+  - openmpi
+  - python@3.8
+  - hdf5
+  - netcdf
+  - cmake
+  - git
+
+# Environment Modules path
+modules_default_path: /usr/share/Modules/modulefiles 
