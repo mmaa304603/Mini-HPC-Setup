@@ -1,0 +1,133 @@
+---
+- name: Validate orchestration options
+  ansible.builtin.assert:
+    that:
+      - core_action in ['plan', 'preflight', 'deploy', 'verify']
+      - core_stage in ['full', 'warewulf_prepare']
+      - core_stage != 'warewulf_prepare' or (core_components == ['warewulf'] and core_action != 'verify')
+      - core_components is sequence and core_components is not string and core_components is not mapping
+      - core_components | difference(['warewulf', 'slurm', 'spack', 'lmod']) | length == 0
+      - core_components | unique | length == core_components | length
+      - "'warewulf' in core_components"
+      - "'lmod' not in core_components or 'spack' in core_components"
+      - groups.get('headnode', []) | length == 1
+      - groups.get('cpu_nodes', []) | length > 0
+      - groups.get('headnode', []) | intersect(groups.get('computenodes', []) + groups.get('cpu_nodes', []) + groups.get('gpu_nodes', [])) | length == 0
+      - groups.get('cpu_nodes', []) | intersect(groups.get('gpu_nodes', [])) | length == 0
+      - ansible_run_tags == ['all']
+      - ansible_skip_tags | length == 0
+      - not ansible_check_mode or core_action in ['plan', 'preflight']
+      - not (core_resume | bool) or (core_checkpoint_enabled | bool)
+    fail_msg: >-
+      Core requires one head, at least one CPU node, disjoint host groups, and
+      Warewulf. Lmod requires Spack. Use core_components to select components;
+      partial runs through tags are unsupported. Use core_action=plan or
+      core_action=preflight for previews instead of deployment in check mode.
+      core_stage=warewulf_prepare requires core_components=[warewulf] and
+      supports plan, preflight or deploy only; verification requires publication.
+
+- name: Select the deployment and verification phases
+  ansible.builtin.set_fact:
+    core_selected_deploy: "{{ core_deploy_phases | selectattr('component', 'in', core_components) | list }}"
+    core_selected_verify: "{{ core_verify_phases | selectattr('component', 'in', core_components) | list }}"
+    core_missing_entries: []
+
+- name: Limit preparation to the first two Warewulf phases
+  ansible.builtin.set_fact:
+    core_selected_deploy: "{{ core_selected_deploy | rejectattr('entry', 'equalto', 'publish') | list }}"
+    core_selected_verify: []
+  when: core_stage == 'warewulf_prepare'
+
+- name: Inspect component entry points on the controller
+  ansible.builtin.set_fact:
+    core_missing_entries: "{{ core_missing_entries + [core_entry.component ~ '/tasks/' ~ core_entry.entry ~ '.yml'] }}"
+  loop: "{{ core_selected_verify if core_action == 'verify' else core_selected_deploy + core_selected_verify }}"
+  loop_control:
+    loop_var: core_entry
+    label: "{{ core_entry.component }}/{{ core_entry.entry }}"
+  when: not (core_components_dir ~ '/' ~ core_entry.component ~ '/tasks/' ~ core_entry.entry ~ '.yml') is file
+
+- name: Report the execution plan and implementation gaps
+  ansible.builtin.debug:
+    msg:
+      action: "{{ core_action }}"
+      stage: "{{ core_stage }}"
+      head: "{{ inventory_hostname }}"
+      cpu_image: "{{ core_cpu_image }}"
+      cpu_nodes: "{{ groups['cpu_nodes'] }}"
+      gpu_nodes_deferred: "{{ groups.get('gpu_nodes', []) }}"
+      deploy: "{{ core_selected_deploy }}"
+      verify_after_boot: "{{ core_selected_verify }}"
+      missing_component_entry_points: "{{ core_missing_entries }}"
+      note: Plan checks role files only; preflight checks setup and deployment inputs on the head.
+
+- name: Require implemented components before deploying or verifying
+  ansible.builtin.assert:
+    that: core_missing_entries | length == 0
+    fail_msg: >-
+      Component integration is incomplete. Missing entry points:
+      {{ core_missing_entries | join(', ') }}.
+      No installation tasks have run. See core/COMPONENT_CONTRACT.md.
+      Existing legacy main.yml entry points are intentionally not used.
+  when: core_action in ['deploy', 'verify']
+
+- name: Check the setup handoff without changing managed state
+  ansible.builtin.include_tasks: preflight.yml
+  when: core_action != 'plan'
+
+- name: Require implemented components for a ready preflight result
+  ansible.builtin.assert:
+    that: core_missing_entries | length == 0
+    fail_msg: >-
+      Head-node handoff checks passed, but component integration is incomplete:
+      {{ core_missing_entries | join(', ') }}. No installation tasks have run.
+  when: core_action == 'preflight'
+
+- name: Deploy under exclusive ownership
+  ansible.builtin.include_tasks: deploy.yml
+  when: core_action == 'deploy'
+
+- name: Validate provisioning protection during read-only preflight
+  ansible.builtin.include_role:
+    name: "{{ core_components_dir }}/warewulf"
+    tasks_from: security
+    public: false
+  when: core_action == 'preflight'
+
+- name: Report that the CPU image is ready for boot verification
+  ansible.builtin.debug:
+    msg: >-
+      Selected components and CPU image publication finished. Boot the CPU
+      nodes with the published image, then run core/playbooks/verify.yml.
+      Cluster acceptance has not yet been verified.
+  when: core_action == 'deploy' and core_stage == 'full'
+
+- name: Report completed Warewulf preparation
+  ansible.builtin.debug:
+    msg: >-
+      Warewulf head and image preparation finished. This run did not publish
+      an image or overlays, or configure Slurm, Spack or Lmod. Provisioning
+      services are active; existing published artifacts may still be served.
+      Run a full deployment with the intended components before boot verification.
+  when: core_action == 'deploy' and core_stage == 'warewulf_prepare'
+
+- name: Wait for the booted CPU nodes
+  ansible.builtin.wait_for_connection:
+    timeout: "{{ core_connection_timeout }}"
+  delegate_to: "{{ item }}"
+  become: false
+  loop: "{{ groups['cpu_nodes'] }}"
+  when: core_action == 'verify'
+
+- name: Run component acceptance checks
+  ansible.builtin.include_tasks: phase.yml
+  loop: "{{ core_selected_verify }}"
+  loop_control:
+    loop_var: core_phase
+    label: "{{ core_phase.component }}/{{ core_phase.entry }}"
+  when: core_action == 'verify'
+
+- name: Report completed acceptance checks
+  ansible.builtin.debug:
+    msg: "All selected component acceptance checks passed for {{ groups['cpu_nodes'] | join(', ') }}."
+  when: core_action == 'verify'

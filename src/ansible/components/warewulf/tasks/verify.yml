@@ -1,0 +1,17 @@
+---
+- name: Require live acceptance checks
+  ansible.builtin.assert:
+    that: not ansible_check_mode
+- name: Verify the complete publication before checking booted workers
+  ansible.builtin.import_tasks: verify_publication.yml
+- name: Check provisioning service health without changing services
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ item }}"]
+  loop: "{{ ['warewulfd', 'dhcpd', 'tftp.socket', 'chronyd'] + (['nfs-server'] if 'spack' in core_components else []) }}"
+  changed_when: false
+- name: Verify booted CPU image, address and mounts
+  ansible.builtin.include_tasks: verify_node.yml
+  loop: "{{ core_cluster.cpu_nodes }}"
+  loop_control:
+    loop_var: warewulf_verify_node
+    label: "{{ warewulf_verify_node.name }}"

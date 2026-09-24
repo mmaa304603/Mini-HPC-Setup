@@ -1,0 +1,149 @@
+---
+- name: Require core and a normal acceptance-test user
+  ansible.builtin.assert:
+    that:
+      - core_cluster is defined
+      - inventory_hostname == core_cluster.head.name
+      - not ansible_check_mode
+      - slurm_verify_user is match('^[a-z_][a-z0-9_-]*$')
+      - slurm_verify_user != 'root'
+      - slurm_cluster_name is match('^[A-Za-z0-9_-]+$')
+- name: Read the existing head service identities
+  ansible.builtin.getent:
+    database: "{{ item }}"
+  loop: [passwd, group]
+- name: Require existing service IDs without changing head accounts
+  ansible.builtin.assert:
+    that:
+      - item.name in ansible_facts.getent_passwd
+      - item.group in ansible_facts.getent_group
+      - ansible_facts.getent_passwd[item.name][1] | int == item.uid
+      - ansible_facts.getent_passwd[item.name][2] | int == item.gid
+      - ansible_facts.getent_group[item.group][1] | int == item.gid
+  loop: "{{ core_cluster.service_users }}"
+- name: Require the existing job user
+  ansible.builtin.assert:
+    that:
+      - slurm_verify_user in ansible_facts.getent_passwd
+      - ansible_facts.getent_passwd[slurm_verify_user][1] | int >= 1000
+- name: Resolve the job user's primary group
+  ansible.builtin.set_fact:
+    slurm_job_user_record: "{{ ansible_facts.getent_passwd[slurm_verify_user] }}"
+- name: Read that existing primary group
+  ansible.builtin.getent:
+    database: group
+    key: "{{ slurm_job_user_record[2] }}"
+  register: slurm_primary_group
+- name: Record only the selected job identity for the image
+  ansible.builtin.set_fact:
+    slurm_job_identity:
+      name: "{{ slurm_verify_user }}"
+      uid: "{{ slurm_job_user_record[1] | int }}"
+      gid: "{{ slurm_job_user_record[2] | int }}"
+      group: "{{ slurm_primary_group.ansible_facts.getent_group.keys() | first }}"
+- name: Install the controller and authentication packages
+  ansible.builtin.dnf:
+    name:
+      - munge
+      - munge-libs
+      - acl
+      - "slurm{{ '-' ~ slurm_version if slurm_version else '' }}"
+      - "slurm-slurmctld{{ '-' ~ slurm_version if slurm_version else '' }}"
+    state: present
+- name: Configure and check the head time server
+  ansible.builtin.import_tasks: time.yml
+- name: Read the actual Slurm RPM release for identical worker installation
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}-%{RELEASE}', slurm]
+  register: slurm_head_rpm
+  changed_when: false
+- name: Record the selected Slurm release
+  ansible.builtin.set_fact:
+    slurm_rpm_release: "{{ slurm_head_rpm.stdout }}"
+- name: Read the head's real hostname for controller identification
+  ansible.builtin.command:
+    argv: [hostname, -s]
+  register: slurm_head_hostname
+  changed_when: false
+- name: Record controller hostname
+  ansible.builtin.set_fact:
+    slurm_controller_hostname: "{{ slurm_head_hostname.stdout }}"
+- name: Prepare service-owned directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.owner }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: /etc/munge, owner: munge, mode: '0700'}
+    - {path: /var/lib/munge, owner: munge, mode: '0700'}
+    - {path: /var/log/munge, owner: munge, mode: '0700'}
+    - {path: /etc/slurm, owner: root, mode: '0755'}
+    - {path: /var/log/slurm, owner: slurm, mode: '0755'}
+    - {path: /var/spool/slurm/state, owner: slurm, mode: '0755'}
+- name: Generate a Munge key only when absent
+  ansible.builtin.command:
+    argv: [/usr/sbin/create-munge-key]
+    creates: /etc/munge/munge.key
+  no_log: true
+  notify: Slurm restart munge
+- name: Inspect the authentication key
+  ansible.builtin.stat:
+    path: /etc/munge/munge.key
+  register: slurm_key_state
+- name: Refuse an empty or redirected authentication key
+  ansible.builtin.assert:
+    that:
+      - slurm_key_state.stat.isreg | default(false)
+      - slurm_key_state.stat.size | default(0) > 0
+- name: Protect the existing Munge key
+  ansible.builtin.file:
+    path: /etc/munge/munge.key
+    owner: munge
+    group: munge
+    mode: '0400'
+  notify: Slurm restart munge
+- name: Create service dependency override directories
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.service.d"
+    state: directory
+    mode: '0755'
+  loop: [munge, slurmctld]
+- name: Order head authentication after the time daemon
+  ansible.builtin.template:
+    src: munge-time.conf.j2
+    dest: /etc/systemd/system/munge.service.d/hpc-time.conf
+    mode: '0644'
+  notify: Slurm restart munge
+- name: Load service dependency overrides
+  ansible.builtin.systemd:
+    daemon_reload: true
+- name: Enable authentication
+  ansible.builtin.systemd:
+    name: munge
+    enabled: true
+    state: started
+- name: Apply the authentication key and dependencies before testing
+  ansible.builtin.meta: flush_handlers
+- name: Test local authentication
+  ansible.builtin.import_tasks: auth_check.yml
+- name: Require authentication before the controller starts
+  ansible.builtin.template:
+    src: slurm-auth.conf.j2
+    dest: /etc/systemd/system/slurmctld.service.d/hpc-auth.conf
+    mode: '0644'
+  notify: Slurm restart controller
+- name: Write controller and CPU configuration
+  ansible.builtin.template:
+    src: slurm.conf.j2
+    dest: /etc/slurm/slurm.conf
+    mode: '0644'
+    backup: true
+  notify: Slurm restart controller
+- name: Enable only the controller on the head
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: slurmctld
+    enabled: true
+    state: started

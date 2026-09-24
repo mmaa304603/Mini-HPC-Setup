@@ -1,0 +1,40 @@
+---
+- name: "Resume completed {{ core_phase.component }} / {{ core_phase.entry }}"
+  ansible.builtin.debug:
+    msg: "CHECKPOINT_SKIP::{{ core_phase.component }}/{{ core_phase.entry }}"
+  when:
+    - core_action == 'deploy'
+    - core_checkpoint_enabled | bool
+    - (core_phase.component ~ '-' ~ core_phase.entry) in core_checkpoint_state.skipped
+
+- name: Execute an unchecked phase and record success
+  when: >-
+    core_action != 'deploy' or not (core_checkpoint_enabled | bool) or
+    (core_phase.component ~ '-' ~ core_phase.entry) not in core_checkpoint_state.skipped
+  block:
+    - name: "Run {{ core_phase.component }} / {{ core_phase.entry }}"
+      ansible.builtin.include_role:
+        name: "{{ core_components_dir }}/{{ core_phase.component }}"
+        tasks_from: "{{ core_phase.entry }}"
+        public: false
+
+    - name: Complete pending service or image changes before the next phase
+      ansible.builtin.meta: flush_handlers
+
+    - name: Save successful phase checkpoint with required nonsecret facts
+      hpc_core_checkpoint:
+        directory: "{{ core_checkpoint_dir }}"
+        state: save
+        plan: "{{ core_checkpoint_plan }}"
+        phase: "{{ core_phase.component }}-{{ core_phase.entry }}"
+        probes: "{{ core_checkpoint_probes }}"
+        facts: >-
+          {{ {'slurm_rpm_release': slurm_rpm_release,
+              'slurm_controller_hostname': slurm_controller_hostname,
+              'slurm_job_identity': slurm_job_identity}
+             if core_phase.component == 'slurm' and core_phase.entry == 'head'
+             else {'lmod_rpm_release': lmod_rpm_release,
+                   'hpc_spack_module_test': hpc_spack_module_test}
+             if core_phase.component == 'lmod' and core_phase.entry == 'head'
+             else {} }}
+      when: core_action == 'deploy' and core_checkpoint_enabled | bool

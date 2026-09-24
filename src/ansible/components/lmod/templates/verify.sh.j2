@@ -1,0 +1,14 @@
+set -eo pipefail
+hpc_lmod_test_home="$(mktemp -d /tmp/hpc-lmod-check.XXXXXX)"
+trap 'rm -rf "$hpc_lmod_test_home"' EXIT
+export HOME="$hpc_lmod_test_home"
+export USER="$(id -un)"
+. /etc/profile.d/z10-hpc-lmod.sh
+test -n "${LMOD_CMD:-}"
+type module >/dev/null
+module --ignore_cache load {{ hpc_spack_module_test.name | quote }}
+actual="$(command -v {{ hpc_spack_module_test.command[0] | quote }})"
+expected={{ (hpc_spack_module_test.prefix ~ '/bin/' ~ hpc_spack_module_test.command[0]) | quote }}
+test "$(readlink -f "$actual")" = "$(readlink -f "$expected")"
+{{ hpc_spack_module_test.command | map('quote') | join(' ') }}
+module unload {{ hpc_spack_module_test.name | quote }}

@@ -1,0 +1,29 @@
+---
+- name: Check the image context
+  ansible.builtin.import_tasks: image_context.yml
+- name: Fingerprint image deployment inputs
+  ansible.builtin.command:
+    argv: [python3, -c, "{{ lookup('ansible.builtin.file', role_path ~ '/files/image_fingerprint.py') }}", "{{ hpc_image_root }}"]
+  register: warewulf_fingerprint
+  changed_when: false
+- name: Record the expected booted image identity
+  ansible.builtin.set_fact:
+    warewulf_image_identity: "{{ core_cluster.cpu_image }}:{{ warewulf_fingerprint.stdout }}"
+- name: Inspect publication receipt
+  ansible.builtin.stat:
+    path: "/var/lib/hpc-setup/images/{{ core_cluster.cpu_image }}.json"
+  register: warewulf_receipt_file
+- name: Read the previous successful publication
+  ansible.builtin.slurp:
+    src: "/var/lib/hpc-setup/images/{{ core_cluster.cpu_image }}.json"
+  register: warewulf_receipt_data
+  when: warewulf_receipt_file.stat.exists
+- name: Load previous publication state
+  ansible.builtin.set_fact:
+    warewulf_publication: "{{ (warewulf_receipt_data.content | b64decode | from_json) if warewulf_receipt_file.stat.exists else {} }}"
+
+- name: Inspect the image archive
+  ansible.builtin.stat:
+    path: "/var/lib/warewulf/provision/images/{{ warewulf_publication.get('archive_image', core_cluster.cpu_image) }}.img.gz"
+    checksum_algorithm: sha256
+  register: warewulf_archive

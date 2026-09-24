@@ -1,0 +1,83 @@
+---
+- name: Read current node properties
+  ansible.builtin.command:
+    argv: [wwctl, node, list, --json, "{{ warewulf_node.name }}"]
+  register: warewulf_node_before
+  changed_when: false
+- name: Refuse inherited disk-wipe or additional network configuration
+  ansible.builtin.assert:
+    that:
+      - (warewulf_node_before.stdout | from_json).get(warewulf_node.name, {}).get('disks', {}) | length == 0
+      - (warewulf_node_before.stdout | from_json).get(warewulf_node.name, {}).get('filesystems', {}) | length == 0
+      - (warewulf_node_before.stdout | from_json).get(warewulf_node.name, {}).get('network devices', {}).keys() | difference(['default']) | length == 0
+    fail_msg: Review the existing node's disks and extra interfaces before adopting it.
+- name: Create a node-specific SSH host-key overlay
+  ansible.builtin.command:
+    argv: [wwctl, overlay, create, "hpc-ssh-{{ warewulf_node.name }}"]
+    creates: "/var/lib/warewulf/overlays/hpc-ssh-{{ warewulf_node.name }}/rootfs"
+- name: Create SSH directory in the node-specific overlay
+  ansible.builtin.file:
+    path: "/var/lib/warewulf/overlays/hpc-ssh-{{ warewulf_node.name }}/rootfs/etc/ssh"
+    state: directory
+    mode: '0755'
+- name: Generate a persistent unique node host key
+  ansible.builtin.command:
+    argv: [ssh-keygen, -q, -t, ed25519, -N, '', -f, "/var/lib/warewulf/overlays/hpc-ssh-{{ warewulf_node.name }}/rootfs/etc/ssh/ssh_host_ed25519_key"]
+    creates: "/var/lib/warewulf/overlays/hpc-ssh-{{ warewulf_node.name }}/rootfs/etc/ssh/ssh_host_ed25519_key"
+  no_log: true
+- name: Read the generated public host key
+  ansible.builtin.slurp:
+    src: "/var/lib/warewulf/overlays/hpc-ssh-{{ warewulf_node.name }}/rootfs/etc/ssh/ssh_host_ed25519_key.pub"
+  register: warewulf_host_public_key
+- name: Ensure the controller's SSH metadata directory exists
+  ansible.builtin.file:
+    path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.ssh"
+    state: directory
+    mode: '0700'
+  delegate_to: localhost
+  become: false
+- name: Trust only this managed node's generated SSH host key
+  ansible.builtin.known_hosts:
+    name: "{{ warewulf_node.address }}"
+    key: "{{ warewulf_node.name }},{{ warewulf_node.address }} {{ warewulf_host_public_key.content | b64decode | trim }}"
+  delegate_to: localhost
+  become: false
+- name: Trust the managed node host key for sudo wwctl ssh
+  ansible.builtin.known_hosts:
+    path: /root/.ssh/known_hosts
+    name: "{{ warewulf_node.address }}"
+    key: "{{ warewulf_node.name }},{{ warewulf_node.address }} {{ warewulf_host_public_key.content | b64decode | trim }}"
+- name: Add a missing CPU node
+  ansible.builtin.command:
+    argv: [wwctl, node, add, "{{ warewulf_node.name }}"]
+  when: warewulf_node.name not in (warewulf_node_before.stdout | from_json)
+  changed_when: true
+- name: Configure CPU image and network without changing other nodes
+  ansible.builtin.command:
+    argv:
+      - wwctl
+      - node
+      - set
+      - "{{ warewulf_node.name }}"
+      - --yes
+      - --profile=UNSET
+      - "--image={{ warewulf_node_image | default(core_cluster.cpu_image) }}"
+      - "--system-overlays={{ (warewulf_system_overlays + ['hpc-ssh-' ~ warewulf_node.name]) | join(',') }}"
+      - "--runtime-overlays={{ warewulf_runtime_overlays | join(',') }}"
+      - --netname=default
+      - --primarynet=default
+      - "--ipaddr={{ warewulf_node.address }}"
+      - "--netmask={{ core_cluster.network.netmask }}"
+      - "--gateway={{ core_cluster.head.address }}"
+      - "--hwaddr={{ warewulf_node.mac }}"
+      - --netdev=eth0
+      - "--nettagadd=DNS={{ warewulf_compute_dns | join(';') }}"
+      - --onboot=true
+      - --discoverable=false
+  register: warewulf_node_set
+  changed_when: false
+- name: Read reconciled node properties
+  ansible.builtin.command:
+    argv: [wwctl, node, list, --json, "{{ warewulf_node.name }}"]
+  register: warewulf_node_after
+  changed_when: (warewulf_node_before.stdout | from_json) != (warewulf_node_after.stdout | from_json)

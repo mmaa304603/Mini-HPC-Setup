@@ -1,0 +1,9 @@
+# Managed by Mini-HPC. Initialize Bash locally; do not access NFS at login.
+if [ -n "${BASH_VERSION:-}" ] && [ -r /usr/share/lmod/lmod/init/bash ]; then
+    if . /usr/share/lmod/lmod/init/bash; then
+        case ":${MODULEPATH:-}:" in
+            *:{{ hpc_spack_module_test.module_path }}:*) ;;
+            *) export MODULEPATH={{ hpc_spack_module_test.module_path | quote }}${MODULEPATH:+:"$MODULEPATH"} ;;
+        esac
+    fi
+fi

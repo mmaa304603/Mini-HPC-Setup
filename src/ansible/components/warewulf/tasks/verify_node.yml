@@ -1,0 +1,40 @@
+---
+- name: Read booted image identity
+  ansible.builtin.command:
+    argv: [cat, /etc/hpc-image-id]
+  delegate_to: "{{ warewulf_verify_node.name }}"
+  register: warewulf_booted_identity
+  changed_when: false
+  failed_when: warewulf_booted_identity.rc != 0 or warewulf_booted_identity.stdout != warewulf_image_identity
+- name: Read booted node addresses
+  ansible.builtin.command:
+    argv: [ip, -j, -4, address, show]
+  delegate_to: "{{ warewulf_verify_node.name }}"
+  register: warewulf_booted_addresses
+  changed_when: false
+- name: Require the assigned CPU address
+  ansible.builtin.assert:
+    that: >-
+      warewulf_verify_node.address in
+      (warewulf_booted_addresses.stdout | from_json | map(attribute='addr_info') |
+       flatten | map(attribute='local') | list)
+- name: Trigger the shared software automount
+  ansible.builtin.command:
+    argv: [stat, "{{ warewulf_spack_export }}/bin/spack"]
+  delegate_to: "{{ warewulf_verify_node.name }}"
+  changed_when: false
+  when: "'spack' in core_components"
+- name: Inspect the software filesystem
+  ansible.builtin.command:
+    argv: [findmnt, -J, -T, "{{ warewulf_spack_export }}"]
+  delegate_to: "{{ warewulf_verify_node.name }}"
+  register: warewulf_software_mount
+  changed_when: false
+  when: "'spack' in core_components"
+- name: Require the head's read-only NFS software export
+  ansible.builtin.assert:
+    that:
+      - (warewulf_software_mount.stdout | from_json).filesystems[0].source == core_cluster.head.address ~ ':' ~ warewulf_spack_export
+      - (warewulf_software_mount.stdout | from_json).filesystems[0].fstype in ['nfs', 'nfs4']
+      - "'ro' in (warewulf_software_mount.stdout | from_json).filesystems[0].options.split(',')"
+  when: "'spack' in core_components"

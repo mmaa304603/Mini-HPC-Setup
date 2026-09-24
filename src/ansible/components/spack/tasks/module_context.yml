@@ -1,0 +1,61 @@
+- name: Validate the module smoke-test inputs
+  ansible.builtin.assert:
+    that:
+    - not ansible_check_mode
+    - '''lmod'' in core_components'
+    - spack_verify_spec is string and spack_verify_spec | length > 0
+    - spack_verify_command is sequence and spack_verify_command is not string
+    - spack_verify_command | length > 0
+    - spack_verify_command[0] is match('^[A-Za-z0-9_.+-]+$')
+- name: Resolve the exact generated module name
+  ansible.builtin.command:
+    argv:
+    - '{{ spack_install_dir }}/bin/spack'
+    - -e
+    - '{{ spack_environment_dir }}'
+    - module
+    - lmod
+    - find
+    - '{{ spack_verify_spec }}'
+  environment: '{{ spack_command_environment }}'
+  register: spack_test_module
+  changed_when: false
+  become: true
+  become_user: '{{ spack_build_user }}'
+- name: Resolve the installed test package prefix
+  ansible.builtin.command:
+    argv:
+    - '{{ spack_install_dir }}/bin/spack'
+    - -e
+    - '{{ spack_environment_dir }}'
+    - location
+    - -i
+    - '{{ spack_verify_spec }}'
+  environment: '{{ spack_command_environment }}'
+  register: spack_test_prefix
+  changed_when: false
+  become: true
+  become_user: '{{ spack_build_user }}'
+- name: Require an unambiguous generated module and shared installation
+  ansible.builtin.assert:
+    that:
+    - spack_test_module.stdout | trim is match('^[A-Za-z0-9][A-Za-z0-9_./+@=-]*$')
+    - '''..'' not in spack_test_module.stdout'
+    - spack_test_prefix.stdout.startswith(spack_install_dir ~ '/opt/spack/')
+- name: Require the module to exist in the shared Core directory
+  ansible.builtin.stat:
+    path: '{{ spack_install_dir }}/modules/lmod/Core/{{ spack_test_module.stdout |
+      trim }}.lua'
+  register: spack_test_module_file
+- name: Reject missing modules before runtime configuration
+  ansible.builtin.assert:
+    that:
+    - spack_test_module_file.stat.isreg | default(false)
+    - spack_test_module_file.stat.size | default(0) > 0
+- name: Export the module test contract
+  ansible.builtin.set_fact:
+    hpc_spack_module_test:
+      module_path: '{{ spack_install_dir }}/modules/lmod/Core'
+      name: '{{ spack_test_module.stdout | trim }}'
+      prefix: '{{ spack_test_prefix.stdout | trim }}'
+      command: '{{ spack_verify_command }}'

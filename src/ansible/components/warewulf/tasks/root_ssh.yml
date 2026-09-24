@@ -1,0 +1,47 @@
+---
+- name: Protect the head root SSH directory
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Create a head root identity only if it does not already exist
+  ansible.builtin.command:
+    argv: [ssh-keygen, -q, -t, ed25519, -N, '', -f, /root/.ssh/id_ed25519]
+    creates: /root/.ssh/id_ed25519
+  no_log: true
+
+- name: Derive the public key from the existing head root identity
+  ansible.builtin.command:
+    argv: [ssh-keygen, -y, -P, '', -f, /root/.ssh/id_ed25519]
+  register: warewulf_head_root_public_key
+  changed_when: false
+  # An encrypted or invalid existing key fails here; it is never replaced.
+
+- name: Keep the head root public key consistent with its private key
+  ansible.builtin.copy:
+    dest: /root/.ssh/id_ed25519.pub
+    content: "{{ warewulf_head_root_public_key.stdout | trim }}\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Select the head root identity for managed compute addresses
+  ansible.builtin.blockinfile:
+    path: /root/.ssh/config
+    create: true
+    owner: root
+    group: root
+    mode: '0600'
+    insertbefore: BOF
+    marker: '# {mark} HPC compute access'
+    block: |
+      Host {{ core_cluster.cpu_nodes | map(attribute='address') | join(' ') }}
+          User root
+          IdentityFile /root/.ssh/id_ed25519
+          IdentitiesOnly yes
+          StrictHostKeyChecking yes
+          UserKnownHostsFile /root/.ssh/known_hosts
+      Host *

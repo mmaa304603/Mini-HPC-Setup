@@ -1,11 +1,13 @@
 ---
-- name: restart slurmd
-  systemd:
-    name: slurmd
+- name: Slurm restart chrony
+  ansible.builtin.systemd:
+    name: chronyd
     state: restarted
-
-- name: restart slurmctld
-  systemd:
+- name: Slurm restart munge
+  ansible.builtin.systemd:
+    name: munge
+    state: restarted
+- name: Slurm restart controller
+  ansible.builtin.systemd:
     name: slurmctld
     state: restarted
-  when: inventory_hostname in groups['headnode'] 

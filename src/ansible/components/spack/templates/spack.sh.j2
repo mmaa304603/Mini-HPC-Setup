@@ -1,3 +1,15 @@
-# Spack environment setup
-export SPACK_ROOT={{ spack_install_dir }}
-export PATH=$SPACK_ROOT/bin:$PATH 
+# Managed by Mini-HPC. Builds run on the head; compute software is read-only.
+export SPACK_ROOT={{ spack_install_dir | quote }}
+# Load Spack on demand: logging in must not touch the NFS software tree.
+spack() {
+    if [ ! -r "$SPACK_ROOT/share/spack/setup-env.sh" ]; then
+        printf '%s\n' "Spack is unavailable at $SPACK_ROOT" >&2
+        return 1
+    fi
+    export SPACK_DISABLE_LOCAL_CONFIG=true
+    export SPACK_PYTHON=/usr/bin/python3
+    export SPACK_SKIP_MODULES=true
+    unset -f spack
+    . "$SPACK_ROOT/share/spack/setup-env.sh" || return
+    spack "$@"
+}

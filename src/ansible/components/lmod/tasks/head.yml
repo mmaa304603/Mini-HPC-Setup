@@ -1,0 +1,41 @@
+---
+- name: Require the core head and Spack integration
+  ansible.builtin.assert:
+    that:
+      - core_cluster is defined
+      - inventory_hostname == core_cluster.head.name
+      - not ansible_check_mode
+      - "'spack' in core_components"
+- name: Resolve the generated Spack module before installing Lmod
+  ansible.builtin.include_role:
+    name: "{{ role_path }}/../spack"
+    tasks_from: module_context
+- name: Install the OS-managed Lmod runtime
+  ansible.builtin.dnf:
+    name: [Lmod, acl]
+    state: present
+- name: Read the head Lmod release for matching worker installation
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}-%{RELEASE}', Lmod]
+  register: lmod_head_rpm
+  changed_when: false
+- name: Record the selected Lmod release
+  ansible.builtin.set_fact:
+    lmod_rpm_release: "{{ lmod_head_rpm.stdout }}"
+- name: Check the packaged Bash initialization script
+  ansible.builtin.stat:
+    path: /usr/share/lmod/lmod/init/bash
+  register: lmod_init
+- name: Require the supported Lmod package layout
+  ansible.builtin.assert:
+    that: lmod_init.stat.exists
+- name: Initialize the shared modules for Bash users
+  ansible.builtin.template:
+    src: lmod.sh.j2
+    dest: /etc/profile.d/z10-hpc-lmod.sh
+    mode: '0644'
+    validate: /bin/bash -n %s
+- name: Test module loading on the head as an unprivileged account
+  ansible.builtin.include_tasks: verify_host.yml
+  vars:
+    lmod_test_host: "{{ inventory_hostname }}"

@@ -1,0 +1,25 @@
+---
+- name: Require a validated CPU image target
+  ansible.builtin.assert:
+    that:
+      - core_cluster is defined
+      - inventory_hostname == core_cluster.head.name
+      - core_cluster.cpu_image is match('^[A-Za-z0-9][A-Za-z0-9_.-]*$')
+      - not ansible_check_mode
+- name: Resolve the image root without accepting symlink redirection
+  ansible.builtin.command:
+    argv: [realpath, -e, "/var/lib/warewulf/chroots/{{ core_cluster.cpu_image }}/rootfs"]
+  register: warewulf_root_path
+  changed_when: false
+- name: Require the expected image root
+  ansible.builtin.assert:
+    that: warewulf_root_path.stdout == '/var/lib/warewulf/chroots/' ~ core_cluster.cpu_image ~ '/rootfs'
+- name: Identify the head root for the in-image execution guard
+  ansible.builtin.command:
+    argv: [stat, -Lc, '%d:%i', /]
+  register: warewulf_head_root_identity
+  changed_when: false
+- name: Export the checked image execution context
+  ansible.builtin.set_fact:
+    hpc_image_root: "{{ warewulf_root_path.stdout }}"
+    hpc_head_root_identity: "{{ warewulf_head_root_identity.stdout }}"

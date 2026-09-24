@@ -1,0 +1,40 @@
+---
+- name: Require the completed controller phase
+  ansible.builtin.assert:
+    that:
+      - slurm_rpm_release is defined
+      - slurm_job_identity is defined
+      - slurm_controller_hostname is defined
+- name: Validate image execution context
+  ansible.builtin.include_role:
+    name: "{{ role_path }}/../warewulf"
+    tasks_from: image_context
+- name: Install and configure the CPU worker inside the image
+  ansible.builtin.command:
+    argv: [wwctl, image, exec, '--build=false', '--syncuser=false', "{{ core_cluster.cpu_image }}", --, /usr/bin/env, "HPC_HEAD_ROOT={{ hpc_head_root_identity }}", /bin/bash, -s]
+    stdin: |
+      {{ lookup('ansible.builtin.file', role_path ~ '/../warewulf/files/image-functions.sh') }}
+      {{ lookup('ansible.builtin.template', 'cpu-image.sh.j2') }}
+  register: slurm_image_result
+  changed_when: "'HPC_CHANGED=1' in slurm_image_result.stdout"
+  failed_when: slurm_image_result.rc != 0 or slurm_image_result.stdout is not search('(?m)^HPC_CHANGED=[01]$')
+- name: Read the protected head Munge key
+  ansible.builtin.slurp:
+    src: /etc/munge/munge.key
+  register: slurm_key_data
+  no_log: true
+- name: Transfer only the authentication key through protected stdin
+  ansible.builtin.command:
+    argv: [wwctl, image, exec, '--build=false', '--syncuser=false', "{{ core_cluster.cpu_image }}", --, /usr/bin/env, "HPC_HEAD_ROOT={{ hpc_head_root_identity }}", /bin/bash, -s]
+    stdin: |
+      {{ lookup('ansible.builtin.file', role_path ~ '/../warewulf/files/image-functions.sh') }}
+      put_file /etc/munge/munge.key 0400 munge munge < <(printf '%s' {{ slurm_key_data.content | quote }} | base64 --decode)
+      echo "HPC_CHANGED=$hpc_changed"
+  register: slurm_key_transfer
+  changed_when: "'HPC_CHANGED=1' in slurm_key_transfer.stdout"
+  no_log: true
+- name: Release the in-memory key result
+  ansible.builtin.set_fact:
+    slurm_key_data: {}
+    slurm_key_transfer: {}
+  no_log: true

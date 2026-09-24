@@ -1,0 +1,17 @@
+---
+core_components: [warewulf, slurm, spack, lmod]
+core_cpu_image: rockylinux-9.5
+# Temporary firmware/iPXE leases; final CPU addresses are in hosts.yml.
+core_dhcp_start: 10.0.1.1
+core_dhcp_end: 10.0.1.255
+
+warewulf_version: "4.6.4"
+# Required before installation: public key(s) for the account running Ansible.
+warewulf_authorized_keys: [ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQ2zFdrunNUKSYgZvWPUD76M4ZPCv6Tc3ThCt49xdKl jay@localhost]
+# Review warewulf_compute_dns (defaults: 1.1.1.1 and 8.8.8.8).
+spack_version: "v0.23.1"
+spack_install_dir: /opt/spack
+spack_packages: [hdf5]             # Expand after the first job works.
+# When changing the representative package, also override spack_verify_command
+# (default: [h5dump, -V]) and optionally spack_verify_spec (default: first spec).
+# spack_build_jobs defaults to 4; lower it if builds compete with head services.

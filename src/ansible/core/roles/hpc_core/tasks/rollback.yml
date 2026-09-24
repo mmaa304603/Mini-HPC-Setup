@@ -1,0 +1,23 @@
+---
+- name: Acquire exclusive deployment ownership for rollback
+  hpc_core_lock:
+    directory: "{{ core_lock_dir }}"
+    state: acquire
+  register: core_rollback_lock
+- name: Restore publication under exclusive ownership
+  block:
+    - name: Run Warewulf publication recovery
+      ansible.builtin.include_role:
+        name: "{{ core_components_dir }}/warewulf"
+        tasks_from: rollback
+    - name: Invalidate deployment receipts after manual rollback
+      ansible.builtin.file:
+        path: "{{ core_checkpoint_dir }}/{{ item.component }}-{{ item.entry }}.json"
+        state: absent
+      loop: "{{ core_deploy_phases }}"
+  always:
+    - name: Release rollback ownership
+      hpc_core_lock:
+        directory: "{{ core_lock_dir }}"
+        state: release
+        token: "{{ core_rollback_lock.token }}"

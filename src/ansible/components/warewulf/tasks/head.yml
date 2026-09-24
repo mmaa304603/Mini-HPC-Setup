@@ -1,0 +1,170 @@
+---
+- name: Check deployment inputs
+  ansible.builtin.import_tasks: prerequisites.yml
+
+- name: Install head provisioning dependencies
+  ansible.builtin.dnf:
+    name: [epel-release, dhcp-server, tftp-server, nfs-utils, openssh-clients, chrony, python3]
+    state: present
+
+- name: Create Warewulf download directory
+  ansible.builtin.file:
+    path: /var/cache/hpc-setup
+    state: directory
+    mode: '0755'
+
+- name: Download the pinned upstream Warewulf RPM
+  ansible.builtin.get_url:
+    url: "{{ warewulf_rpm_url }}"
+    dest: "/var/cache/hpc-setup/warewulf-{{ warewulf_version }}.rpm"
+    checksum: "{{ warewulf_rpm_checksum }}"
+    mode: '0644'
+
+# Upstream release RPMs are unsigned; HTTPS and the pinned asset digest are required.
+- name: Install the upstream release RPM
+  ansible.builtin.dnf:
+    name: "/var/cache/hpc-setup/warewulf-{{ warewulf_version }}.rpm"
+    disable_gpg_check: true
+    state: present
+
+- name: Require the supported installed version
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}', warewulf]
+  register: warewulf_installed_version
+  changed_when: false
+  failed_when: warewulf_installed_version.rc != 0 or warewulf_installed_version.stdout != warewulf_version
+
+- name: Configure Warewulf
+  ansible.builtin.template:
+    src: warewulf.conf.j2
+    dest: /etc/warewulf/warewulf.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Warewulf restart daemon
+
+- name: Create DHCP service override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/dhcpd.service.d
+    state: directory
+    mode: '0755'
+
+- name: Bind DHCP to the private cluster interface
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/dhcpd.service.d/hpc-interface.conf
+    content: |
+      [Service]
+      ExecStart=
+      ExecStart=/usr/sbin/dhcpd -f -cf /etc/dhcp/dhcpd.conf -user dhcpd -group dhcpd --no-pid {{ core_cluster.network.interface }}
+    mode: '0644'
+
+- name: Create persistent publication guards for provisioning daemons
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.service.d"
+    state: directory
+    mode: '0755'
+  loop: [warewulfd, dhcpd, tftp]
+- name: Prevent reboot from serving a partially migrated release
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item }}.service.d/hpc-publication.conf"
+    mode: '0644'
+    content: |
+      [Service]
+      ExecStartPre=/usr/bin/test ! -e {{ warewulf_release_dir }}/switching
+  loop: [warewulfd, dhcpd, tftp]
+
+- name: Load provisioning service definitions
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Configure private networking and forwarding
+  ansible.builtin.import_tasks: network.yml
+
+- name: Create the selected software export directory
+  ansible.builtin.file:
+    path: "{{ warewulf_spack_export }}"
+    state: directory
+    mode: '0755'
+  when: "'spack' in core_components"
+
+- name: Ensure the NFS exports directory exists
+  ansible.builtin.file:
+    path: /etc/exports.d
+    state: directory
+    mode: '0755'
+  when: "'spack' in core_components"
+
+- name: Configure only the selected NFS export
+  ansible.builtin.copy:
+    dest: /etc/exports.d/hpc-spack.exports
+    content: "{{ warewulf_spack_export }} {{ core_cluster.network.cidr }}(ro,sync,root_squash,no_subtree_check)\n"
+    mode: '0644'
+  when: "'spack' in core_components"
+  notify: Warewulf reload exports
+
+- name: Enable NFS server
+  ansible.builtin.systemd:
+    name: nfs-server
+    enabled: true
+    state: started
+  when: "'spack' in core_components"
+
+- name: Allow cluster time clients
+  ansible.builtin.blockinfile:
+    path: /etc/chrony.conf
+    marker: '# {mark} HPC cluster time clients'
+    block: "allow {{ core_cluster.network.cidr }}"
+  notify: Warewulf restart chrony
+
+- name: Enable time service
+  ansible.builtin.systemd:
+    name: chronyd
+    enabled: true
+    state: started
+
+- name: Detect an existing managed publication
+  ansible.builtin.stat:
+    path: "{{ warewulf_release_dir }}/current"
+  register: warewulf_current_release
+
+- name: Generate initial DHCP and TFTP service configuration
+  ansible.builtin.command:
+    argv: [wwctl, configure, "{{ item }}"]
+  loop: [dhcp, tftp]
+  when: item != 'dhcp' or not warewulf_current_release.stat.exists
+  changed_when: true
+
+- name: Apply the initial PXE lease policy
+  ansible.builtin.include_tasks: dhcp_policy.yml
+  vars:
+    warewulf_dhcp_config_path: /etc/dhcp/dhcpd.conf
+  when: not warewulf_current_release.stat.exists
+
+- name: Restart initial DHCP after applying the validated lease policy
+  ansible.builtin.systemd:
+    name: dhcpd
+    state: restarted
+  when:
+    - not warewulf_current_release.stat.exists
+    - warewulf_dhcp_policy.changed
+
+- name: Require actual PXE bootloader files after configuration
+  ansible.builtin.stat:
+    path: "/var/lib/tftpboot/warewulf/{{ item }}"
+  loop: [undionly.kpxe, ipxe-snponly-x86_64.efi]
+  register: warewulf_bootloaders
+
+- name: Reject an incomplete TFTP configuration
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+      - item.stat.size | default(0) > 0
+    fail_msg: Warewulf could not copy a required iPXE binary; check the installed ipxe-bootimgs package.
+  loop: "{{ warewulf_bootloaders.results }}"
+
+- name: Enable provisioning daemon
+  ansible.builtin.systemd:
+    name: warewulfd
+    enabled: true
+    state: started

@@ -1,0 +1,29 @@
+---
+- name: Check deployment inputs
+  ansible.builtin.import_tasks: prerequisites.yml
+- name: Prepare the head root identity for sudo wwctl ssh
+  ansible.builtin.import_tasks: root_ssh.yml
+- name: Import a bootable Rocky image without building it
+  ansible.builtin.command:
+    argv: [wwctl, image, import, '--build=false', "{{ warewulf_image_source }}", "{{ core_cluster.cpu_image }}"]
+    creates: "/var/lib/warewulf/chroots/{{ core_cluster.cpu_image }}/rootfs"
+- name: Check image execution context
+  ansible.builtin.import_tasks: image_context.yml
+- name: Prepare identities and base services inside the image
+  ansible.builtin.command:
+    argv: [wwctl, image, exec, '--build=false', '--syncuser=false', "{{ core_cluster.cpu_image }}", --, /usr/bin/env, "HPC_HEAD_ROOT={{ hpc_head_root_identity }}", /bin/bash, -s]
+    stdin: |
+      {{ lookup('ansible.builtin.file', role_path ~ '/files/image-functions.sh') }}
+      {{ lookup('ansible.builtin.template', 'image-base.sh.j2') }}
+  register: warewulf_image_prepare
+  changed_when: "'HPC_CHANGED=1' in warewulf_image_prepare.stdout"
+  failed_when: warewulf_image_prepare.rc != 0 or warewulf_image_prepare.stdout is not search('(?m)^HPC_CHANGED=[01]$')
+- name: Maintain head and CPU hostname resolution
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: '# {mark} HPC cluster'
+    block: |
+      {{ core_cluster.head.address }} {{ core_cluster.head.name }}
+      {% for node in core_cluster.cpu_nodes %}
+      {{ node.address }} {{ node.name }}
+      {% endfor %}

@@ -1,0 +1,16 @@
+spack:
+  specs:
+{{ spack_packages | to_nice_yaml(indent=2) | indent(4, true) }}
+  view: {{ spack_view_dir | to_json }}
+  concretizer:
+    unify: true
+  config:
+    install_tree:
+      root: {{ (spack_install_dir ~ '/opt/spack') | to_json }}
+    build_jobs: {{ spack_build_jobs | int }}
+    build_stage:
+      - /var/tmp/hpc-spack-stage
+  packages:
+    all:
+      target: [x86_64]
+      compiler: ["gcc@{{ spack_gcc.stdout }}"]

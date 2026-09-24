@@ -1,0 +1,78 @@
+---
+# Override deployment inputs in config/group_vars/all.yml.
+core_action: deploy                  # plan | preflight | deploy | verify
+core_stage: full                     # full | warewulf_prepare (head + image_prepare only)
+core_components: [warewulf, slurm, spack, lmod]
+core_components_dir: "{{ playbook_dir }}/../../components"
+core_setup_file: /etc/hpc-setup/setup.yml
+core_setup_complete_flag: /var/log/hpc-setup/checkpoints/setup_complete
+core_cpu_image: rockylinux-9.6
+core_dhcp_start: 10.0.1.1
+core_dhcp_end: 10.0.1.255
+core_connection_timeout: 120
+# The active release and its replacement coexist until activation is verified.
+core_min_free_bytes: 6442450944       # 6 GiB
+core_min_free_inodes: 100000
+# Every deployment records successful phases. Resume is an explicit opt-in.
+core_checkpoint_enabled: true
+core_resume: false
+core_checkpoint_dir: /var/log/hpc-setup/checkpoints/core
+core_lock_dir: /run/lock/hpc-core-deploy
+
+# Stable observations only: do not hash files deliberately changed by later phases.
+core_image_root: "/var/lib/warewulf/chroots/{{ core_cpu_image }}/rootfs"
+core_checkpoint_probes:
+  warewulf-head:
+    paths: [/etc/warewulf/warewulf.conf, /etc/systemd/system/dhcpd.service.d/hpc-interface.conf]
+    commands:
+      - [rpm, -q, warewulf]
+      - [systemctl, is-active, warewulfd, dhcpd, tftp.socket, chronyd]
+  warewulf-image_prepare:
+    paths:
+      - /root/.ssh/config
+      - /root/.ssh/id_ed25519.pub
+      - "{{ core_image_root }}/root/.ssh/authorized_keys"
+      - "{{ core_image_root }}/etc/ssh/sshd_config.d/20-hpc-hostkey.conf"
+      - "{{ core_image_root }}/usr/bin/python3"
+    commands:
+      - [ssh-keygen, -y, -P, '', -f, /root/.ssh/id_ed25519]
+  slurm-head:
+    paths: [/etc/munge/munge.key, /etc/slurm/slurm.conf, /etc/chrony.conf]
+    commands:
+      - [rpm, -q, slurm, munge]
+      - [hostname, -s]
+      - [systemctl, is-active, slurmctld, munge, chronyd]
+      - [getent, passwd, "{{ slurm_verify_user | default((core_setup_contents.content | b64decode | from_yaml).admin_user) }}"]
+  slurm-cpu_image:
+    paths:
+      - "{{ core_image_root }}/etc/munge/munge.key"
+      - "{{ core_image_root }}/etc/slurm/slurm.conf"
+      - "{{ core_image_root }}/etc/slurm/cgroup.conf"
+    commands:
+      - [rpm, --root, "{{ core_image_root }}", -q, slurm, slurm-slurmd, munge]
+  spack-head:
+    paths:
+      - "{{ spack_install_dir | default('/opt/spack') }}/environments/hpc/spack.lock"
+      - "{{ spack_install_dir | default('/opt/spack') }}/environments/hpc/spack.yaml"
+      - /etc/profile.d/hpc-spack.sh
+    commands:
+      - [runuser, -u, hpc-spack, --, env, SPACK_DISABLE_LOCAL_CONFIG=true, SPACK_USER_CACHE_PATH=/var/cache/hpc-spack, SPACK_PYTHON=/usr/bin/python3, "{{ spack_install_dir | default('/opt/spack') }}/bin/spack", -e, "{{ spack_install_dir | default('/opt/spack') }}/environments/hpc", find, --format, '{hash}']
+  spack-cpu_image:
+    paths:
+      - "{{ core_image_root }}/etc/fstab"
+      - "{{ core_image_root }}/etc/profile.d/hpc-spack.sh"
+  lmod-head:
+    paths: [/etc/profile.d/z10-hpc-lmod.sh, /usr/share/lmod/lmod/init/bash]
+    commands: [[rpm, -q, Lmod]]
+  lmod-cpu_image:
+    paths:
+      - "{{ core_image_root }}/etc/profile.d/z10-hpc-lmod.sh"
+      - "{{ core_image_root }}/usr/share/lmod/lmod/init/bash"
+    commands: [[rpm, --root, "{{ core_image_root }}", -q, Lmod]]
+  warewulf-publish:
+    trees: [/var/lib/warewulf/provision]
+    paths:
+      - /root/.ssh/known_hosts
+      - /etc/warewulf/nodes.conf
+      - "/var/lib/hpc-setup/images/{{ core_cpu_image }}.json"
+    commands: [[systemctl, is-active, warewulfd, dhcpd, tftp.socket]]

@@ -1,0 +1,26 @@
+---
+- name: Verify the selected release including all overlay hashes
+  hpc_release:
+    base: "{{ warewulf_release_dir }}"
+    state: verify
+  register: warewulf_verified_release
+- name: Inspect current image inputs and selected archive
+  ansible.builtin.import_tasks: publication_state.yml
+- name: Require the published image to match current image inputs
+  ansible.builtin.assert:
+    that:
+      - warewulf_publication.get('identity', '') == warewulf_image_identity
+      - warewulf_archive.stat.isreg | default(false)
+      - warewulf_archive.stat.checksum | default('') == warewulf_publication.get('archive_sha256', 'missing')
+- name: Require active provisioning services
+  ansible.builtin.command:
+    argv: [systemctl, is-active, warewulfd, dhcpd, tftp.socket]
+  changed_when: false
+- name: Require the served kernel lookup to use the verified immutable snapshot
+  ansible.builtin.command:
+    argv: [realpath, -e, "/var/lib/warewulf/chroots/{{ warewulf_publication.archive_image }}/rootfs"]
+  register: warewulf_kernel_root
+  changed_when: false
+  failed_when: >-
+    warewulf_kernel_root.rc != 0 or
+    warewulf_kernel_root.stdout != warewulf_verified_release.release ~ '/chroots/' ~ warewulf_publication.archive_image ~ '/rootfs'

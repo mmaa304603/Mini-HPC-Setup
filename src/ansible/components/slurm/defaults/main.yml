@@ -1,0 +1,8 @@
+---
+# Empty selects the installed/available EPEL version; the image gets that exact RPM release.
+slurm_version: ""
+slurm_cluster_name: mini-hpc
+slurm_controller_port: 6817
+slurm_worker_port: 6818
+slurm_srun_ports: 60001-63000
+slurm_verify_user: "{{ (core_setup_contents.content | b64decode | from_yaml).admin_user }}"

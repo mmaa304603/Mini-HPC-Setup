@@ -1,32 +1,40 @@
-WW_INTERNAL: 43
-ipaddr: {{ network_ip }}
-netmask: {{ network_mask }}
-network: {{ network }}
+# Managed by the Warewulf component for 4.6.4.
+ipaddr: {{ core_cluster.network.address }}
+netmask: {{ core_cluster.network.netmask }}
+network: {{ core_cluster.network.network }}
 warewulf:
   port: 9873
-  secure: false
+  secure: true
   update interval: 60
-  autobuild: true
+  autobuild overlays: false
   host overlay: true
-  syslog: true
+  grubboot: false
 dhcp:
   enabled: true
-  range start: {{ dhcp_start }}
-  range end: {{ dhcp_end }}
+  # PXE gets a temporary lease; the NetworkManager overlay applies the node IP.
+  template: default
+  range start: {{ core_cluster.network.dhcp_start }}
+  range end: {{ core_cluster.network.dhcp_end }}
   systemd name: dhcpd
 tftp:
   enabled: true
-  tftpdir: /var/lib/tftpboot
-  systemd name: tftp
+  tftproot: /var/lib/tftpboot
+  systemd name: tftp.socket
+  ipxe:
+    "00:00": undionly.kpxe
+    "00:07": ipxe-snponly-x86_64.efi
+    "00:09": ipxe-snponly-x86_64.efi
+# This role manages /etc/exports.d/hpc-spack.exports, preserving other exports.
 nfs:
-  enabled: true
-  export paths:
-    - path: /home
-      export options: rw,sync,no_subtree_check
-    - path: /opt
-      export options: rw,sync,no_subtree_check
-    - path: /scratch
-      export options: rw,sync,no_subtree_check
-  systemd name: nfs-server
-container_base = /var/lib/warewulf/container
-container_name = rocky-8 
+  enabled: false
+# Do not install Warewulf's automatic per-user SSH configuration behavior.
+ssh:
+  key types: []
+image mounts:
+  - source: /etc/resolv.conf
+    dest: /etc/resolv.conf
+    readonly: true
+paths:
+  wwchrootdir: /var/lib/warewulf/chroots
+  wwoverlaydir: /var/lib/warewulf/overlays
+  wwprovisiondir: /var/lib/warewulf/provision

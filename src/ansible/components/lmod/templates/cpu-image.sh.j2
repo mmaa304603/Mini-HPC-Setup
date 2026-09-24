@@ -1,0 +1,7 @@
+install_packages {{ ('Lmod-' ~ lmod_rpm_release) | quote }} acl
+test -r /usr/share/lmod/lmod/init/bash
+put_file /etc/profile.d/z10-hpc-lmod.sh 0644 root root <<'HPC_LMOD'
+{% include 'lmod.sh.j2' %}{{ '\n' }}
+HPC_LMOD
+/bin/bash -n /etc/profile.d/z10-hpc-lmod.sh
+echo "HPC_CHANGED=$hpc_changed"

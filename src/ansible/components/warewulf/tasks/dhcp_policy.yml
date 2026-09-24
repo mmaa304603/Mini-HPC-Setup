@@ -1,0 +1,15 @@
+---
+# PXE firmware and iPXE may send different client IDs for the same NIC.
+# Match the shell workflow without erasing the server's existing leases.
+- name: Use MAC-based lease identity across PXE boot stages
+  ansible.builtin.lineinfile:
+    path: "{{ warewulf_dhcp_config_path }}"
+    regexp: '^\s*ignore-client-uids\s+'
+    line: 'ignore-client-uids true;'
+    insertafter: '^authoritative;'
+  register: warewulf_dhcp_policy
+
+- name: Validate the generated DHCP configuration
+  ansible.builtin.command:
+    argv: [dhcpd, -t, -cf, "{{ warewulf_dhcp_config_path }}"]
+  changed_when: false

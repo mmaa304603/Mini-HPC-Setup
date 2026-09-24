@@ -1,106 +1,46 @@
-# Deployment Configurations
+# Cluster configuration
 
-This directory contains environment-specific configurations for deploying the Mini HPC cluster. These configurations control how the implementation code runs but are not part of the source code itself.
+One physical cluster uses two deployment files:
 
-## Purpose
-
-The config directory contains settings for:
-- Environment-specific deployments
-- Security and access control
-- Resource allocation
-- Service configuration
-
-## Directory Structure
-
-```
+```text
 config/
-├── dev/          # Development environment
-│   ├── ansible/  # Ansible development config
-│   └── shell/    # Shell development config
-│
-├── test/         # Testing environment
-│   ├── ansible/  # Ansible test config
-│   └── shell/    # Shell test config
-│
-└── prod/         # Production environment
-    ├── ansible/  # Ansible production config
-    └── shell/    # Shell production config
+├── hosts.yml             # Node inventory and per-node hardware settings
+└── group_vars/all.yml    # Shared deployment overrides
 ```
 
-## Environment Types
+`hosts.yml` contains the README's one local head, three diskless CPU nodes and
+one preinstalled GPU node. Verify the CPU PXE NIC MACs, usable Slurm memory,
+CPU topology and SSH connection settings before deployment. CPU memory is
+7000 MB per node, matching `SLURM_DEFAULT_MEM` in the shell Slurm configuration;
+override it per host if hardware differs.
+The GPU address is reserved but the initial core workflow configures CPUs only.
 
-### Development
-- Located in `config/dev/`
-- Used for local development
-- Includes debug settings
-- May include test data
-- Not for production use
+`group_vars/all.yml` selects Warewulf, Slurm, Spack and Lmod, the DHCP range and
+CPU image, and software overrides. Ansible automatically loads this file next
+to the inventory. Component defaults stay with their roles; add overrides only
+when needed. There are no dev/test/prod copies for this single cluster.
 
-### Testing
-- Located in `config/test/`
-- Used for CI/CD testing
-- Includes test-specific settings
-- May include mock services
-- Simulates production environment
+Head interface/address and service IDs come from the effective configuration
+written by the existing setup workflow at `/etc/hpc-setup/setup.yml`. Do not
+duplicate those values here. Changing setup inputs still follows setup's own
+documented workflow.
 
-### Production
-- Located in `config/prod/`
-- Used for production deployment
-- Includes security settings
-- May include sensitive data
-- Requires careful management
+From `src/ansible`, inspect the cluster plan:
 
-## Usage
-
-### Ansible Configuration
 ```bash
-# Use development config
-ansible-playbook -i config/dev/ansible/inventory site.yml
-
-# Use test config
-ansible-playbook -i config/test/ansible/inventory site.yml
-
-# Use production config
-ansible-playbook -i config/prod/ansible/inventory site.yml
+ansible-playbook core/playbooks/site.yml -e core_action=plan
 ```
 
-### Shell Configuration
-```bash
-# Use development config
-./src/shell/install.sh -c config/dev/shell/config.json
+The root Ansible configuration selects this inventory. Keep setup using its
+own `setup/ansible.cfg`. Tests use temporary inventories and recording roles,
+not this cluster's live machines. These YAML files configure the Ansible core;
+the shell implementation continues to use its existing configuration files.
 
-# Use test config
-./src/shell/install.sh -c config/test/shell/config.json
-
-# Use production config
-./src/shell/install.sh -c config/prod/shell/config.json
-```
-
-## Security Guidelines
-
-### Sensitive Data
-- Never commit sensitive data
-- Use environment variables for secrets
-- Follow security best practices
-- Review configuration regularly
-
-### Access Control
-- Restrict access to production configs
-- Use encryption for sensitive data
-- Implement audit logging
-- Regular security reviews
-
-## Version Control
-
-### Configuration Management
-- Track changes in version control
-- Use branches for different environments
-- Document configuration changes
-- Regular backups of configurations
-
-## Support
-
-For configuration issues:
-- Email: hpc-dev@ttu.edu
-- Documentation: `docs/development/configuration.md`
-- Issues: [GitHub Issues](https://github.com/ttu-hpc/Mini-HPC-Setup/issues) 
+Warewulf, Slurm, Spack and Lmod entry points are implemented. Supply the controller
+public SSH keys in warewulf_authorized_keys, verify usable Slurm memory, and
+review compute DNS before installation. The default selection deploys all four.
+Spack's package list drives software builds; Lmod exposes the generated modules.
+See the
+[core README](../src/ansible/core/README.md) for commands, current limitations,
+and the required component entry points. Do not store Munge keys or passwords
+in these files.

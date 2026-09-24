@@ -1,0 +1,13 @@
+modules:
+  default:
+    enable: {{ ['lmod'] if 'lmod' in core_components else [] }}
+    roots:
+      lmod: {{ (spack_install_dir ~ '/modules/lmod') | to_json }}
+    arch_folder: false
+    lmod:
+      core_compilers:
+        - gcc@{{ spack_gcc.stdout }}
+      # One compiler and one flat Core directory for the initial cluster.
+      hierarchy:: []
+      all:
+        autoload: direct

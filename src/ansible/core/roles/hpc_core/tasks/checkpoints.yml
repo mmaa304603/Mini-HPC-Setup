@@ -1,0 +1,38 @@
+---
+- name: Fingerprint deployment inputs and ordered component code
+  hpc_core_fingerprint:
+    phases: "{{ core_selected_deploy }}"
+    core_role: "{{ role_path }}"
+    components_dir: "{{ core_components_dir }}"
+    cluster: "{{ core_cluster }}"
+    setup: "{{ core_setup_contents.content | b64decode | from_yaml }}"
+  register: core_checkpoint_fingerprints
+  no_log: true
+
+- name: Keep the fingerprint plan without configuration values
+  ansible.builtin.set_fact:
+    core_checkpoint_plan: "{{ core_checkpoint_fingerprints.plan }}"
+
+- name: Load matching checkpoints and invalidate phases that must run
+  hpc_core_checkpoint:
+    directory: "{{ core_checkpoint_dir }}"
+    state: prepare
+    plan: "{{ core_checkpoint_plan }}"
+    resume: "{{ core_resume | bool }}"
+    probes: "{{ core_checkpoint_probes }}"
+  register: core_checkpoint_state
+
+- name: Restore only validated facts required by later image phases
+  ansible.builtin.set_fact:
+    "{{ item.key }}": "{{ item.value }}"
+  loop: "{{ core_checkpoint_state.restored_facts | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Report checkpoint resume selection
+  ansible.builtin.debug:
+    msg:
+      checkpoint_directory: "{{ core_checkpoint_dir }}"
+      resume: "{{ core_resume | bool }}"
+      skipped_phases: "{{ core_checkpoint_state.skipped }}"
+      note: Resume checks recorded artifacts and stable health probes. Run full acceptance with verify.yml after boot.

@@ -1,0 +1,89 @@
+---
+- name: Check worker service health
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ item }}"]
+  delegate_to: "{{ slurm_verify_node.name }}"
+  loop: [chronyd, munge, slurmd]
+  changed_when: false
+- name: Verify worker time synchronization
+  ansible.builtin.import_tasks: time_check.yml
+  delegate_to: "{{ slurm_verify_node.name }}"
+- name: Read the worker's selected time source
+  ansible.builtin.command:
+    argv: [chronyc, -n, sources]
+  delegate_to: "{{ slurm_verify_node.name }}"
+  register: slurm_worker_time_sources
+  changed_when: false
+- name: Require the head to be the worker's selected NTP server
+  ansible.builtin.assert:
+    that: >-
+      (slurm_worker_time_sources.stdout_lines | select('match', '^\^\*\s+') |
+       map('split') | map(attribute=1) | list) == [core_cluster.head.address]
+    fail_msg: The worker must synchronize with the head's private address.
+- name: Verify the worker's exact Slurm release
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}-%{RELEASE}', slurm]
+  delegate_to: "{{ slurm_verify_node.name }}"
+  register: slurm_worker_version
+  changed_when: false
+  failed_when: slurm_worker_version.rc != 0 or slurm_worker_version.stdout != slurm_verify_head_version.stdout
+- name: Create a short-lived head authentication credential
+  ansible.builtin.command:
+    argv: [munge, -n]
+  register: slurm_verify_credential
+  changed_when: false
+  no_log: true
+- name: Decode that credential on the worker
+  ansible.builtin.command:
+    argv: [unmunge]
+    stdin: "{{ slurm_verify_credential.stdout }}"
+  delegate_to: "{{ slurm_verify_node.name }}"
+  changed_when: false
+  no_log: true
+- name: Create a short-lived worker authentication credential
+  ansible.builtin.command:
+    argv: [munge, -n]
+  delegate_to: "{{ slurm_verify_node.name }}"
+  register: slurm_verify_reverse_credential
+  changed_when: false
+  no_log: true
+- name: Decode the worker credential on the head
+  ansible.builtin.command:
+    argv: [unmunge]
+    stdin: "{{ slurm_verify_reverse_credential.stdout }}"
+  changed_when: false
+  no_log: true
+- name: Release cross-node authentication credentials
+  ansible.builtin.set_fact:
+    slurm_verify_credential: {}
+    slurm_verify_reverse_credential: {}
+  no_log: true
+- name: Require the CPU worker to be registered and usable
+  ansible.builtin.command:
+    argv: [sinfo, --noheader, "--nodes={{ slurm_verify_node.name }}", --format=%T]
+  register: slurm_node_state
+  changed_when: false
+  until: slurm_node_state.rc == 0 and slurm_node_state.stdout | trim in ['idle', 'allocated', 'mixed']
+  retries: 12
+  delay: 5
+- name: Run a bounded CPU job as the normal user
+  ansible.builtin.command:
+    argv:
+      - timeout
+      - --signal=TERM
+      - --kill-after=10
+      - '90'
+      - srun
+      - --immediate=15
+      - --time=00:01:00
+      - --ntasks=1
+      - --cpus-per-task=1
+      - "--nodelist={{ slurm_verify_node.name }}"
+      - --chdir=/tmp
+      - /bin/hostname
+      - -s
+  become: true
+  become_user: "{{ slurm_verify_user }}"
+  register: slurm_test_job
+  changed_when: false
+  failed_when: slurm_test_job.rc != 0 or slurm_test_job.stdout | trim != slurm_verify_node.name

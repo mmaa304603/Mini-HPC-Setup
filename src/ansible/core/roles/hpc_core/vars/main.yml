@@ -1,0 +1,17 @@
+---
+# Explicit order; callers select components, not arbitrary installation phases.
+core_deploy_phases:
+  - {component: warewulf, entry: head}
+  - {component: warewulf, entry: image_prepare}
+  - {component: slurm, entry: head}
+  - {component: slurm, entry: cpu_image}
+  - {component: spack, entry: head}
+  - {component: spack, entry: cpu_image}
+  - {component: lmod, entry: head}
+  - {component: lmod, entry: cpu_image}
+  - {component: warewulf, entry: publish}
+core_verify_phases:
+  - {component: warewulf, entry: verify}
+  - {component: slurm, entry: verify}
+  - {component: spack, entry: verify}
+  - {component: lmod, entry: verify}

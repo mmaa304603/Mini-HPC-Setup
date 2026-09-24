@@ -1,0 +1,47 @@
+{% for account in core_cluster.service_users %}
+check_identity {{ account.name | quote }} {{ account.uid }} {{ account.group | quote }} {{ account.gid }}
+{% endfor %}
+check_identity {{ slurm_job_identity.name | quote }} {{ slurm_job_identity.uid }} {{ slurm_job_identity.group | quote }} {{ slurm_job_identity.gid }}
+{% for account in core_cluster.service_users %}
+ensure_identity {{ account.name | quote }} {{ account.uid }} {{ account.group | quote }} {{ account.gid }} /var/lib/{{ account.name }} /sbin/nologin
+{% endfor %}
+install_packages {{ ('slurm-' ~ slurm_rpm_release) | quote }} {{ ('slurm-slurmd-' ~ slurm_rpm_release) | quote }} munge munge-libs chrony
+ensure_identity {{ slurm_job_identity.name | quote }} {{ slurm_job_identity.uid }} {{ slurm_job_identity.group | quote }} {{ slurm_job_identity.gid }} /home/{{ slurm_job_identity.name }} /bin/bash
+ensure_dir /home/{{ slurm_job_identity.name }} 0700 {{ slurm_job_identity.name | quote }} {{ slurm_job_identity.group | quote }}
+ensure_dir /etc/munge 0700 munge munge
+ensure_dir /var/lib/munge 0700 munge munge
+ensure_dir /var/log/munge 0700 munge munge
+ensure_dir /etc/slurm 0755 root root
+ensure_dir /var/log/slurm 0755 slurm slurm
+ensure_dir /var/spool/slurm/d 0755 root root
+put_file /etc/slurm/slurm.conf 0644 root root <<'HPC_SLURM'
+{% include 'slurm.conf.j2' %}{{ '\n' }}
+HPC_SLURM
+put_file /etc/slurm/cgroup.conf 0644 root root <<'HPC_CGROUP'
+CgroupPlugin=autodetect
+ConstrainCores=yes
+ConstrainRAMSpace=yes
+HPC_CGROUP
+put_file /etc/systemd/system/munge.service.d/hpc-time.conf 0644 root root <<'HPC_TIME'
+{% include 'munge-time.conf.j2' %}{{ '\n' }}
+HPC_TIME
+put_file /etc/systemd/system/slurmd.service.d/hpc-auth.conf 0644 root root <<'HPC_AUTH'
+{% include 'slurm-auth.conf.j2' %}{{ '\n' }}
+HPC_AUTH
+put_file /etc/chrony.conf 0644 root root <<'HPC_CHRONY'
+server {{ core_cluster.head.address }} iburst
+makestep 1.0 3
+rtcsync
+HPC_CHRONY
+enable_service chronyd
+enable_service munge
+enable_service slurmd
+if command -v firewall-offline-cmd >/dev/null; then
+    zone="$(firewall-offline-cmd --get-default-zone)"
+    rule='rule family="ipv4" source address="{{ core_cluster.network.cidr }}" port port="{{ slurm_worker_port }}" protocol="tcp" accept'
+    if ! firewall-offline-cmd --zone="$zone" --query-rich-rule="$rule" >/dev/null; then
+        firewall-offline-cmd --zone="$zone" --add-rich-rule="$rule"
+        hpc_changed=1
+    fi
+fi
+echo "HPC_CHANGED=$hpc_changed"

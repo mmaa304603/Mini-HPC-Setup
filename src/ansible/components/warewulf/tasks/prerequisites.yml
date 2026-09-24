@@ -1,0 +1,32 @@
+---
+- name: Require the validated core contract
+  ansible.builtin.assert:
+    that:
+      - core_cluster is defined
+      - not ansible_check_mode
+      - inventory_hostname == core_cluster.head.name
+      - warewulf_version == '4.6.4'
+      - warewulf_rpm_checksum is match('^sha256:[0-9a-f]{64}$')
+      - core_cluster.network.interface is match('^[A-Za-z0-9_.:-]+$')
+      - warewulf_cluster_zone is match('^[A-Za-z0-9_-]+$')
+      - warewulf_compute_dns | length > 0
+      - warewulf_authorized_keys | length > 0
+      - warewulf_spack_export is match('^/opt/[A-Za-z0-9_/-]+$')
+      - "'..' not in warewulf_spack_export"
+    fail_msg: >-
+      Run through core on the head. This implementation targets Warewulf 4.6.4.
+      Set warewulf_authorized_keys to controller public keys, review compute DNS,
+      and use a dedicated software directory under /opt.
+- name: Validate public keys
+  ansible.builtin.assert:
+    that:
+      - item is match('^(ssh-ed25519|ssh-rsa|ecdsa-sha2-[^ ]+) [A-Za-z0-9+/=]+( .*)?$')
+      - item.splitlines() | length == 1
+    fail_msg: warewulf_authorized_keys must contain public SSH keys, one per list entry.
+  loop: "{{ warewulf_authorized_keys }}"
+- name: Reject software-export symlink redirection
+  ansible.builtin.command:
+    argv: [realpath, -m, "{{ warewulf_spack_export }}"]
+  register: warewulf_export_realpath
+  changed_when: false
+  failed_when: warewulf_export_realpath.rc != 0 or warewulf_export_realpath.stdout != warewulf_spack_export

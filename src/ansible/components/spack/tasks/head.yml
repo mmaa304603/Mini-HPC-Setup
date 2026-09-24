@@ -1,0 +1,182 @@
+---
+- name: Validate the shared software layout
+  ansible.builtin.assert:
+    that:
+      - core_cluster is defined
+      - inventory_hostname == core_cluster.head.name
+      - not ansible_check_mode
+      - spack_version == 'v0.23.1'
+      - spack_commit == '2bfcc69fa870d3c6919be87593f22647981b648a'
+      - spack_build_user == 'hpc-spack'
+      - spack_install_dir is match('^/opt/[A-Za-z0-9_/-]+$')
+      - "'..' not in spack_install_dir"
+      - spack_environment_dir == spack_install_dir ~ '/environments/hpc'
+      - spack_view_dir == spack_install_dir ~ '/views/hpc'
+      - spack_packages is sequence and spack_packages is not string
+      - spack_packages | length > 0
+      - spack_build_jobs | int > 0
+- name: Reject a redirected shared software path
+  ansible.builtin.command:
+    argv: [realpath, -m, "{{ spack_install_dir }}"]
+  register: spack_realpath
+  changed_when: false
+  failed_when: spack_realpath.rc != 0 or spack_realpath.stdout != spack_install_dir
+- name: Install build prerequisites through the OS package manager
+  ansible.builtin.dnf:
+    name: [git, gcc, gcc-c++, gcc-gfortran, make, patch, tar, bzip2, unzip, xz, findutils, diffutils, python3, python3-pyyaml, python3-jinja2]
+    state: present
+- name: Reject redirected builder home, cache and stage paths before changing ownership
+  ansible.builtin.command:
+    argv: [realpath, -m, "{{ item }}"]
+  loop: [/var/lib/hpc-spack, /var/cache/hpc-spack, /var/tmp/hpc-spack-stage]
+  register: spack_builder_paths
+  changed_when: false
+  failed_when: spack_builder_paths.rc != 0 or spack_builder_paths.stdout != item
+- name: Refuse a pre-existing builder with privileged IDs
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - |
+        import pwd, sys
+        try:
+            account = pwd.getpwnam(sys.argv[1])
+        except KeyError:
+            sys.exit(0)
+        if account.pw_uid == 0 or account.pw_gid == 0:
+            sys.exit('Existing Spack builder has privileged IDs; review it without renumbering accounts')
+      - "{{ spack_build_user }}"
+  changed_when: false
+- name: Create the dedicated unprivileged software builder
+  ansible.builtin.user:
+    name: "{{ spack_build_user }}"
+    system: true
+    create_home: true
+    home: /var/lib/hpc-spack
+    shell: /sbin/nologin
+- name: Create only the dedicated software and cache directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ spack_build_user }}"
+    follow: false
+    mode: '0755'
+  loop:
+    - "{{ spack_install_dir }}"
+    - /var/cache/hpc-spack
+    - /var/tmp/hpc-spack-stage
+- name: Migrate ownership inside the dedicated Spack trees without following links
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/migrate_owner.py') }}"
+      - "{{ spack_build_user }}"
+      - "{{ spack_install_dir }}"
+      - /var/cache/hpc-spack
+      - /var/tmp/hpc-spack-stage
+  register: spack_ownership
+  changed_when: "'HPC_CHANGED=1' in spack_ownership.stdout"
+- name: Install the pinned Spack checkout without discarding local edits
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.git:
+    repo: "{{ spack_repo }}"
+    dest: "{{ spack_install_dir }}"
+    version: "{{ spack_commit }}"
+    force: false
+- name: Create the shared environment directory
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.file:
+    path: "{{ spack_environment_dir }}"
+    state: directory
+    mode: '0755'
+- name: Read system compiler version
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.command:
+    argv: [gcc, -dumpfullversion]
+  register: spack_gcc
+  changed_when: false
+- name: Detect system compilers in the shared site configuration
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.command:
+    argv: ["{{ spack_install_dir }}/bin/spack", compiler, find, --scope, site]
+  environment: "{{ spack_command_environment }}"
+  register: spack_compiler_find
+  changed_when: "'Added' in spack_compiler_find.stdout"
+- name: Write the reproducible software environment
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.template:
+    src: spack.yaml.j2
+    dest: "{{ spack_environment_dir }}/spack.yaml"
+    mode: '0644'
+- name: Configure module generation for the selected module system
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.template:
+    src: modules.yaml.j2
+    dest: "{{ spack_install_dir }}/etc/spack/modules.yaml"
+    mode: '0644'
+- name: Record the previous concretized environment
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.stat:
+    path: "{{ spack_environment_dir }}/spack.lock"
+    checksum_algorithm: sha256
+  register: spack_lock_before
+- name: Validate and preserve an existing dependency plan
+  ansible.builtin.include_tasks: validate_lockfile.yml
+  when: spack_lock_before.stat.exists
+- name: Concretize the requested environment
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.command:
+    argv: ["{{ spack_install_dir }}/bin/spack", -e, "{{ spack_environment_dir }}", concretize]
+  environment: "{{ spack_command_environment }}"
+  changed_when: false
+- name: Detect changes to the concretized environment
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.stat:
+    path: "{{ spack_environment_dir }}/spack.lock"
+    checksum_algorithm: sha256
+  register: spack_lock_after
+  changed_when: spack_lock_before.stat.checksum | default('') != spack_lock_after.stat.checksum
+- name: Validate and preserve the concretized dependency plan
+  ansible.builtin.include_tasks: validate_lockfile.yml
+- name: Install missing software in the environment
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    # sudo/Ansible can supply a PTY without a controlling terminal. The Spack
+    # logger calls tcgetpgrp on it and crashes; builds must be non-interactive.
+    exec </dev/null
+    umask 022
+    before="$({{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} find --format '{hash}')"
+    {{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} install --fail-fast
+    after="$({{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} find --format '{hash}')"
+    if [[ "$before" != "$after" ]]; then echo HPC_SPACK_CHANGED; fi
+  args:
+    executable: /bin/bash
+  environment: "{{ spack_command_environment }}"
+  register: spack_install_result
+  changed_when: "'HPC_SPACK_CHANGED' in spack_install_result.stdout"
+- name: Generate modules for the installed environment when Lmod is selected
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.command:
+    argv: ["{{ spack_install_dir }}/bin/spack", -e, "{{ spack_environment_dir }}", module, lmod, refresh, -y]
+  environment: "{{ spack_command_environment }}"
+  when: "'lmod' in core_components"
+  changed_when: true
+- name: Initialize the head's Spack shell environment
+  ansible.builtin.template:
+    src: spack.sh.j2
+    dest: /etc/profile.d/hpc-spack.sh
+    mode: '0644'
+    validate: /bin/bash -n %s

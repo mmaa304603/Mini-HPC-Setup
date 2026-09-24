@@ -108,6 +108,8 @@ These network settings are configured and utilized in Warewulf for provisioning 
 ### Ansible Method
 - Uses Ansible for configuration management
 - Located in `src/ansible/`
+- Core workflow and current implementation status: [Core README](src/ansible/core/README.md)
+- Cluster inventory and settings: [Configuration](config/README.md)
 - Features:
   - Declarative configuration
   - Idempotent operations

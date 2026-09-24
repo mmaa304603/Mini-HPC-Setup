@@ -1,32 +1,23 @@
-ClusterName=hpc-cluster
-
-# Node definitions
-{% for host in groups['computenodes'] %}
-NodeName={{ host }} State=UNKNOWN
-{% endfor %}
-
-# Partition definitions
-PartitionName=compute Nodes=compute[01-03] Default=YES MaxTime=INFINITE State=UP
-
-# Prolog and Epilog
-Prolog=/etc/slurm/prolog.sh
-Epilog=/etc/slurm/epilog.sh
-
-# Logging
+# Managed by Mini-HPC; the same configuration is installed in the CPU image.
+ClusterName={{ slurm_cluster_name }}
+SlurmctldHost={{ slurm_controller_hostname }}({{ core_cluster.head.address }})
+SlurmUser=slurm
+SlurmdUser=root
+SlurmctldPort={{ slurm_controller_port }}
+SlurmdPort={{ slurm_worker_port }}
+SrunPortRange={{ slurm_srun_ports }}
+AuthType=auth/munge
+StateSaveLocation=/var/spool/slurm/state
+SlurmdSpoolDir=/var/spool/slurm/d
 SlurmctldLogFile=/var/log/slurm/slurmctld.log
 SlurmdLogFile=/var/log/slurm/slurmd.log
-
-# Authentication
-AuthAltTypes=auth/munge
-AuthAltParameters=/var/run/munge/munge.socket.2
-
-# Task control
-TaskPlugin=task/affinity
-TaskPlugin=task/cgroup
-
-# Node configuration
-NodeName=compute[01-03] Sockets=1 CoresPerSocket=4 ThreadsPerCore=1 State=UNKNOWN
-
-# Default settings
-DefMemPerNode=4096
-MaxMemPerNode=8192 
+SchedulerType=sched/backfill
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core_Memory
+ProctrackType=proctrack/cgroup
+TaskPlugin=task/cgroup,task/affinity
+ReturnToService=2
+{% for node in core_cluster.cpu_nodes %}
+NodeName={{ node.name }} NodeAddr={{ node.address }} CPUs={{ node.slurm.sockets * node.slurm.cores_per_socket * node.slurm.threads_per_core }} Sockets={{ node.slurm.sockets }} CoresPerSocket={{ node.slurm.cores_per_socket }} ThreadsPerCore={{ node.slurm.threads_per_core }} RealMemory={{ node.slurm.real_memory_mb }} State=UNKNOWN
+{% endfor %}
+PartitionName=cpu Nodes={{ core_cluster.cpu_nodes | map(attribute='name') | join(',') }} Default=YES MaxTime=INFINITE State=UP

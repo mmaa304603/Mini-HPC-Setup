@@ -1,0 +1,9 @@
+---
+- name: Load the generated module and run its executable without inherited environment
+  ansible.builtin.command:
+    argv: [timeout, '60', env, -i, 'PATH=/usr/bin:/bin', /bin/bash, --noprofile, --norc, -s]
+    stdin: "{{ lookup('ansible.builtin.template', 'verify.sh.j2') }}"
+  delegate_to: "{{ lmod_test_host }}"
+  become: true
+  become_user: nobody
+  changed_when: false

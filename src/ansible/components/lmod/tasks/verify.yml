@@ -1,0 +1,23 @@
+---
+- name: Resolve the installed module for acceptance
+  ansible.builtin.include_role:
+    name: "{{ role_path }}/../spack"
+    tasks_from: module_context
+- name: Read the head Lmod release
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}-%{RELEASE}', Lmod]
+  register: lmod_verify_rpm
+  changed_when: false
+- name: Require matching Lmod versions on every worker
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}-%{RELEASE}', Lmod]
+  delegate_to: "{{ item.name }}"
+  loop: "{{ core_cluster.cpu_nodes }}"
+  register: lmod_worker_rpm
+  changed_when: false
+  failed_when: lmod_worker_rpm.rc != 0 or lmod_worker_rpm.stdout != lmod_verify_rpm.stdout
+- name: Test fresh module shells on the head and every worker
+  ansible.builtin.include_tasks: verify_host.yml
+  loop: "{{ [inventory_hostname] + (core_cluster.cpu_nodes | map(attribute='name') | list) }}"
+  loop_control:
+    loop_var: lmod_test_host

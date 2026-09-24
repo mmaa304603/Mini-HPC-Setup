@@ -1,123 +1,118 @@
-# Spack Role
+# Spack component
 
-This Ansible role installs and configures Spack at the system level, making it available to all users on the system. Spack is a flexible package manager designed to support multiple versions, configurations, platforms, and compilers.
+Implements head, cpu_image and verify entry points for Spack v0.23.1. The head
+installs OS build prerequisites, checks out the pinned Spack tree without
+discarding local edits, detects compilers, and concretizes/installs a shared
+software environment. Checkout and Spack commands run under the dedicated
+`hpc-spack` account, using exact commit `2bfcc69fa870d3c6919be87593f22647981b648a`.
+Root installs OS prerequisites and system profiles. No system-wide pip installation
+is used. Run the entry points through [core](../../core/README.md); standalone
+role execution is rejected. The current software target is generic x86_64 CPU
+nodes, not GPU or aarch64 provisioning.
 
-## Features
+## Ownership migration
 
-- Installs Spack from source in `/opt/spack`
-- Configures system-wide Spack settings in `/etc/spack`
-- Sets up system compilers and external packages
-- Configures environment modules for package management
-- Installs common HPC packages
-- Creates system-wide environment file in `/etc/profile.d/spack.sh`
+The builder uses `/var/lib/hpc-spack` as its home, `/var/cache/hpc-spack` as its
+cache, and `/var/tmp/hpc-spack-stage` for builds. Legacy ownership migration is
+limited to the dedicated installation, cache and staging trees. It skips
+symlinks and other filesystems and supports hardlinks whose links are all inside
+those trees. It refuses unexpected special files and ownership changes to
+hardlinks shared outside them. A failure may follow earlier ownership changes;
+stop concurrent Spack builds and inspect the reported problem before retrying.
+Retain the installation database and installed software.
 
-## Requirements
+## Build reruns and lockfile recovery
 
-- RHEL/CentOS/Rocky Linux 7 or later
-- Git
-- GCC and development tools
-- Environment Modules
-- Python 3 with required packages (clingo, pyyaml, jinja2)
+The install task redirects stdin from `/dev/null` for non-interactive builds.
+This avoids Spack 0.23.1's terminal-query failure when sudo/Ansible supplies a
+pseudo-terminal without a controlling terminal (`Inappropriate ioctl for device`
+followed by `BrokenPipeError`). Build errors still fail the playbook. After
+updating the task, rerun core normally; retain the lockfile and installed software.
 
-## Role Variables
+Core validates existing lockfiles before concretization and saves a validated
+`spack.lock.last-good` before/after successful concretization. An empty or corrupt
+lockfile stops deployment with its path. Stop concurrent Spack runs before
+recovery; restore a valid backup when available. Otherwise move the corrupt
+lockfile aside and reconcretize, keeping the install database and software.
+Reconstruction can select different dependency versions; it cannot restore
+the lost exact plan. The last-good copy is not a full software rollback.
 
-### Installation
+## Configuration and deployment
 
-- `spack_version`: Spack version to install (default: `v0.23.1`)
-- `spack_install_dir`: Directory where Spack will be installed (default: `/opt/spack`)
-- `spack_config_dir`: Directory for Spack configuration files (default: `/etc/spack`)
-- `spack_repo`: Spack repository URL (default: `https://github.com/spack/spack.git`)
+- spack_install_dir: /opt/spack
+- spack_environment_dir: /opt/spack/environments/hpc
+- spack_view_dir: /opt/spack/views/hpc
+- spack_packages: [hdf5] initially
+- spack_build_jobs: 4
+- spack_verify_command: [h5dump, -V]
+- spack_verify_spec: first requested spec (used for the Lmod executable test)
 
-### Build Configuration
+The environment and view stay inside the exported installation directory.
+If you change the package list, also select an appropriate executable smoke
+test. A generic x86_64 target avoids building software only for the head's
+particular CPU microarchitecture.
 
-- `spack_build_jobs`: Number of parallel build jobs (default: `8`)
-- `spack_build_language`: Build language (default: `C`)
-- `spack_install_path_scheme`: Installation path scheme (default: `{name}/{version}-{compiler.name}-{compiler.version}/{hash}`)
+From `src/ansible`, after setup and configuration, the default full deployment
+runs Spack after Slurm and before Lmod:
 
-### Cache Configuration
-
-- `spack_source_cache`: Source cache directory (default: `{{ spack_install_dir }}/sources`)
-- `spack_misc_cache`: Miscellaneous cache directory (default: `{{ spack_install_dir }}/cache`)
-- `spack_build_stage`: Build stage directory (default: `/tmp/spack-stage`)
-
-### Module Configuration
-
-- `spack_module_roots`: Module roots configuration
-  ```yaml
-  spack_module_roots:
-    tcl: "{{ spack_install_dir }}/modules/tcl"
-    lmod: "{{ spack_install_dir }}/modules/lmod"
-  ```
-
-### Compilers
-
-- `spack_compilers`: List of system compiler paths to add to Spack
-  ```yaml
-  spack_compilers:
-    - /usr/bin/gcc
-    - /usr/bin/g++
-    - /usr/bin/gfortran
-  ```
-
-### Packages
-
-- `spack_packages`: List of packages to install
-  ```yaml
-  spack_packages:
-    - openmpi
-    - python@3.8
-    - hdf5
-    - netcdf
-    - cmake
-    - git
-  ```
-
-### Environment Modules
-
-- `modules_default_path`: Path to system modulefiles (default: `/usr/share/Modules/modulefiles`)
-
-## Configuration Files
-
-The role creates the following configuration files in `{{ spack_config_dir }}`:
-
-- `config.yaml`: General Spack configuration
-- `compilers.yaml`: System compiler definitions
-- `packages.yaml`: Package preferences and external packages
-- `modules.yaml`: Module file generation settings
-- `spack.yaml`: Environment-specific settings
-
-## Example Playbook
-
-```yaml
-- hosts: hpc_nodes
-  roles:
-    - role: spack
-      vars:
-        spack_version: "v0.23.1"
-        spack_packages:
-          - openmpi
-          - python@3.8
-          - hdf5
-          - netcdf
-          - cmake
-        spack_compilers:
-          - /usr/bin/gcc
-          - /usr/bin/g++
-          - /usr/bin/gfortran
+```bash
+ansible-playbook core/playbooks/site.yml -K -e core_action=preflight
+ansible-playbook core/playbooks/site.yml -K
+# After CPU nodes boot the published image:
+ansible-playbook core/playbooks/verify.yml -K
 ```
 
-## User Access
+Spack uses a lockfile and its installed-package database for reruns. Adding a
+package does not get skipped merely because an installation database exists.
+Builds run on the head; compute nodes consume a read-only NFS software tree.
+Warewulf owns that export. The image phase adds only a managed fstab block and
+shell initialization, preserving other filesystem entries. The NFS mount uses
+`nofail` and automount. Spack initializes on the first `spack` command, avoiding
+shared-filesystem reads during ordinary login. It uses the managed site config;
+system and user configuration overrides are disabled for this entry point.
 
-After the role is applied, users need to either:
-1. Log out and log back in
-2. Run `source /etc/profile.d/spack.sh`
+The image phase creates a missing `/etc/fstab` before managing its entries.
+Both head and image profiles are syntax checked. Embedded profile templates
+have explicit newline boundaries, and the image task requires its final
+completion marker. For existing `}HPC_PROFILE` or unexpected-end-of-file errors,
+use the [image repair procedure](../../core/README.md#recovering-images-built-with-malformed-template-boundaries).
 
-This will make Spack available in their environment.
+Lmod module generation is enabled only when Lmod is selected in core_components.
+Spack owns modules.yaml and generated files under /opt/spack/modules/lmod/Core;
+generation happens at the end of its head phase, before Lmod installation.
+The Lmod role owns the OS runtime and shell module path. A single flat Core
+directory uses the detected system GCC as the core compiler; the environment
+prefers that compiler and targets generic x86_64. Spack works without Lmod.
+The `hierarchy:: []` override deliberately replaces Spack's default MPI hierarchy.
 
-## License
+For maintenance, edit `spack_packages` in `config/group_vars/all.yml`, then rerun
+core deployment. The lockfile and install database retain existing solutions;
+module refresh reconciles generated files without deleting the whole tree.
+Removed specs are not automatically uninstalled. If the representative package
+changes, update its smoke-test command/spec too.
 
-MIT
+Verification requires every requested package and runs the selected executable
+as `nobody` from the environment view on the head and each CPU node. Warewulf verification
+separately checks that the view is supplied by the expected read-only NFS mount.
 
-## Author Information
+## Build progress and operational limits
 
-Created for HPC-Setup project 
+One requested root spec such as HDF5 can require many dependency builds.
+Installation can therefore take much longer than installing one OS package.
+Inspect the saved plan using the same builder and configuration as the role:
+
+```bash
+sudo -u hpc-spack env SPACK_DISABLE_LOCAL_CONFIG=true \
+  SPACK_USER_CACHE_PATH=/var/cache/hpc-spack SPACK_PYTHON=/usr/bin/python3 \
+  /opt/spack/bin/spack -e /opt/spack/environments/hpc find --show-concretized
+```
+
+Tune `spack_build_jobs` for available head CPU and memory, and allow disk space
+for build stages as well as installed software. Package build scripts execute
+as the builder and require trusted sources; this is not a build sandbox.
+Software and module changes become visible through NFS immediately, including
+to already booted workers. Warewulf release rollback does not roll them back.
+
+See [local tests](../tests/README.md),
+[Spack 0.23.1 environments](https://spack.readthedocs.io/en/v0.23.1/environments.html)
+and [module configuration](https://spack.readthedocs.io/en/v0.23.1/module_file_support.html).

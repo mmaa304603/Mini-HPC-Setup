@@ -1,36 +1,4 @@
 ---
-- name: Install EPEL repository
-  dnf:
-    name: epel-release
-    state: present
-
-- name: Install SLURM packages
-  dnf:
-    name:
-      - slurm
-      - slurm-devel
-      - slurm-perlapi
-    state: present
-
-- name: Create SLURM configuration directory
-  file:
-    path: /etc/slurm
-    state: directory
-    mode: '0755'
-
-- name: Configure SLURM
-  template:
-    src: slurm.conf.j2
-    dest: /etc/slurm/slurm.conf
-    mode: '0644'
-  notify: restart slurmd
-
-- name: Enable and start SLURM services
-  systemd:
-    name: "{{ item }}"
-    state: started
-    enabled: yes
-  loop:
-    - slurmd
-    - slurmctld
-  when: inventory_hostname in groups['headnode'] 
+- name: Require the phased core entry point
+  ansible.builtin.fail:
+    msg: Use core/playbooks/site.yml; Slurm requires separate head and cpu_image phases.

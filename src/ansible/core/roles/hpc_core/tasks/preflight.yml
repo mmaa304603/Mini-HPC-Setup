@@ -1,0 +1,119 @@
+---
+- name: Inspect the setup handoff files on the head
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ core_setup_complete_flag }}"
+    - "{{ core_setup_file }}"
+  register: core_handoff_files
+
+- name: Require completed setup and its effective configuration
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+      - item.stat.uid | default(-1) == 0
+    fail_msg: "Missing or non-root-owned setup artifact: {{ item.item }}. Complete setup first."
+  loop: "{{ core_handoff_files.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Read the effective setup configuration from the head
+  ansible.builtin.slurp:
+    src: "{{ core_setup_file }}"
+  register: core_setup_contents
+
+- name: Construct the validated cluster contract
+  ansible.builtin.set_fact:
+    core_cluster: >-
+      {{ (core_setup_contents.content | b64decode | from_yaml)
+         | hpc_cluster_contract(groups, hostvars, core_dhcp_start, core_dhcp_end, core_cpu_image, core_components) }}
+
+- name: Gather the head operating system facts
+  ansible.builtin.setup:
+    gather_subset: ['!all', min]
+
+- name: Require the supported head operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Rocky'
+      - ansible_facts.distribution_major_version == '9'
+      - ansible_facts.architecture == 'x86_64'
+    fail_msg: This core deployment targets a Rocky Linux 9 x86_64 head and CPU image.
+
+- name: Read available space for deployment artifacts
+  ansible.builtin.command:
+    argv: [df, -B1, --output=avail, /]
+  register: core_free_bytes
+  changed_when: false
+  check_mode: false
+  when: core_action in ['preflight', 'deploy']
+
+- name: Read available inodes for deployment artifacts
+  ansible.builtin.command:
+    argv: [df, --output=iavail, /]
+  register: core_free_inodes
+  changed_when: false
+  check_mode: false
+  when: core_action in ['preflight', 'deploy']
+
+- name: Require capacity for the active and staged releases
+  ansible.builtin.assert:
+    that:
+      - (core_free_bytes.stdout_lines | last | trim | int) >= (core_min_free_bytes | int)
+      - (core_free_inodes.stdout_lines | last | trim | int) >= (core_min_free_inodes | int)
+    fail_msg: >-
+      The head root filesystem needs at least {{ core_min_free_bytes | int }} free
+      bytes and {{ core_min_free_inodes | int }} free inodes before deployment.
+      Free stale release data or expand the filesystem before retrying.
+  when: core_action in ['preflight', 'deploy']
+
+- name: Read the current service identities without modifying them
+  ansible.builtin.getent:
+    database: "{{ item }}"
+  loop: [passwd, group]
+
+- name: Require unchanged Slurm and Munge identities
+  ansible.builtin.assert:
+    that:
+      - item.name in ansible_facts.getent_passwd
+      - item.group in ansible_facts.getent_group
+      - ansible_facts.getent_passwd[item.name][1] | int == item.uid
+      - ansible_facts.getent_passwd[item.name][2] | int == item.gid
+      - ansible_facts.getent_group[item.group][1] | int == item.gid
+    fail_msg: >-
+      {{ item.name }} does not match completed setup. Core never changes head
+      UID/GID assignments. Resolve the mismatch before deploying components.
+  loop: "{{ core_cluster.service_users }}"
+
+- name: Read the actual cluster-interface address
+  ansible.builtin.command:
+    argv: [ip, -j, -4, address, show, dev, "{{ core_cluster.network.interface }}"]
+  register: core_interface_state
+  changed_when: false
+  check_mode: false
+
+- name: Read all IPv4 default routes
+  ansible.builtin.command:
+    argv: [ip, -j, -4, route, show, table, all, default]
+  register: core_default_routes
+  changed_when: false
+  check_mode: false
+
+- name: Verify setup address and management-interface separation
+  ansible.builtin.assert:
+    that:
+      - >-
+        (core_interface_state.stdout | from_json
+         | map(attribute='addr_info') | flatten
+         | selectattr('local', 'equalto', core_cluster.network.address)
+         | selectattr('prefixlen', 'equalto', core_cluster.network.prefix) | list | length) > 0
+      - >-
+        (core_default_routes.stdout | from_json
+         | selectattr('dev', 'defined')
+         | selectattr('dev', 'equalto', core_cluster.network.interface) | list | length) == 0
+      - >-
+        (core_default_routes.stdout | from_json
+         | selectattr('dev', 'defined') | list | length) > 0
+    fail_msg: >-
+      The cluster address differs from setup, the cluster NIC carries a default
+      route, or no upstream default route exists. Core will not reconfigure the NIC.

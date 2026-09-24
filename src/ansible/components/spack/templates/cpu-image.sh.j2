@@ -1,0 +1,20 @@
+install_packages nfs-utils python3 libstdc++ libgfortran
+ensure_dir {{ spack_install_dir | quote }} 0755 root root
+fstab="$(mktemp)"
+trap 'rm -f "$fstab"' EXIT
+# Minimal container images can omit fstab. Start with the empty temporary file
+# in that case; otherwise preserve all entries outside our managed block.
+if [[ -e /etc/fstab || -L /etc/fstab ]]; then
+    awk '/^# BEGIN HPC SPACK$/{skip=1;next} /^# END HPC SPACK$/{skip=0;next} !skip' /etc/fstab > "$fstab"
+fi
+cat >> "$fstab" <<'HPC_FSTAB'
+# BEGIN HPC SPACK
+{{ core_cluster.head.address }}:{{ spack_install_dir }} {{ spack_install_dir }} nfs4 ro,nofail,_netdev,x-systemd.automount,x-systemd.mount-timeout=30 0 0
+# END HPC SPACK
+HPC_FSTAB
+put_file /etc/fstab 0644 root root < "$fstab"
+put_file /etc/profile.d/hpc-spack.sh 0644 root root <<'HPC_PROFILE'
+{% include 'spack.sh.j2' %}{{ '\n' }}
+HPC_PROFILE
+/bin/bash -n /etc/profile.d/hpc-spack.sh
+echo "HPC_CHANGED=$hpc_changed"

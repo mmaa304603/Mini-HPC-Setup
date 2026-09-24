@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<zone>
+  <short>HPC private network</short>
+  <interface name="{{ core_cluster.network.interface }}"/>
+  <service name="ssh"/>
+  <service name="dhcp"/>
+  <service name="tftp"/>
+  <service name="ntp"/>
+  <port protocol="tcp" port="9873"/>
+{% if 'spack' in core_components %}
+  <service name="nfs"/>
+{% endif %}
+{% if 'slurm' in core_components %}
+  <port protocol="tcp" port="{{ slurm_controller_port | default(6817) }}"/>
+  <port protocol="tcp" port="{{ slurm_srun_ports | default('60001-63000') }}"/>
+{% endif %}
+</zone>

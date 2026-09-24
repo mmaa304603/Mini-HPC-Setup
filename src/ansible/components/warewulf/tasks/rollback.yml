@@ -1,0 +1,23 @@
+---
+- name: Stop provisioning before restoring a complete release
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+  loop: [dhcpd, tftp.socket, tftp.service, warewulfd]
+- name: Restore the preceding publication selector
+  hpc_release:
+    base: "{{ warewulf_release_dir }}"
+    state: rollback
+- name: Validate restored publication integrity
+  hpc_release:
+    base: "{{ warewulf_release_dir }}"
+    state: verify
+- name: Restore the rolled-back DHCP configuration SELinux label
+  ansible.builtin.command:
+    argv: [/usr/sbin/restorecon, -F, /etc/dhcp/dhcpd.conf]
+  changed_when: false
+- name: Start provisioning only after successful rollback
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+  loop: [warewulfd, tftp.socket, dhcpd]

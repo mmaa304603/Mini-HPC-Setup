@@ -1,0 +1,20 @@
+---
+- name: Ensure the head time service is installed
+  ansible.builtin.dnf:
+    name: chrony
+    state: present
+- name: Allow compute nodes to synchronize with the head
+  ansible.builtin.blockinfile:
+    path: /etc/chrony.conf
+    marker: '# {mark} HPC cluster time clients'
+    block: "allow {{ core_cluster.network.cidr }}"
+  notify: Slurm restart chrony
+- name: Enable the head time service
+  ansible.builtin.systemd:
+    name: chronyd
+    enabled: true
+    state: started
+- name: Apply time-server configuration before testing synchronization
+  ansible.builtin.meta: flush_handlers
+- name: Check head time synchronization before starting authentication
+  ansible.builtin.import_tasks: time_check.yml

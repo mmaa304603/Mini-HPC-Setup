@@ -1,0 +1,10 @@
+---
+# One attempt per command keeps failure bounded and exposes progress in Ansible.
+- name: Require a synchronized clock with less than one second remaining correction
+  ansible.builtin.command:
+    argv: [chronyc, waitsync, '1', '1.0', '0.0', '1']
+  register: slurm_clock_check
+  changed_when: false
+  until: slurm_clock_check.rc == 0
+  retries: 24
+  delay: 5

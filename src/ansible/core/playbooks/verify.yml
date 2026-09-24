@@ -1,0 +1,11 @@
+---
+- name: Verify the booted CPU cluster
+  hosts: headnode
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  vars:
+    core_action: verify
+  roles:
+    - role: hpc_core
+      tags: [always]

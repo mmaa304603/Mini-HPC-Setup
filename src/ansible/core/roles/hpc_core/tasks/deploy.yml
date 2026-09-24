@@ -1,0 +1,38 @@
+---
+- name: Acquire exclusive head deployment ownership
+  hpc_core_lock:
+    directory: "{{ core_lock_dir }}"
+    state: acquire
+  register: core_deploy_lock
+
+- name: Run the deployment while holding its lock
+  block:
+    - name: Validate selected provisioning security requirements before mutation
+      ansible.builtin.include_role:
+        name: "{{ core_components_dir }}/warewulf"
+        tasks_from: security
+        public: false
+
+    - name: Prepare deployment checkpoints after successful preflight
+      ansible.builtin.include_tasks: checkpoints.yml
+      when: core_checkpoint_enabled | bool
+
+    - name: Run the selected installation phases on the head and image
+      ansible.builtin.include_tasks: phase.yml
+      loop: "{{ core_selected_deploy }}"
+      loop_control:
+        loop_var: core_phase
+        label: "{{ core_phase.component }}/{{ core_phase.entry }}"
+
+    - name: Verify served artifacts even when publication was skipped
+      ansible.builtin.include_role:
+        name: "{{ core_components_dir }}/warewulf"
+        tasks_from: verify_publication
+        public: false
+      when: core_stage == 'full'
+  always:
+    - name: Release only this deployment's lock
+      hpc_core_lock:
+        directory: "{{ core_lock_dir }}"
+        state: release
+        token: "{{ core_deploy_lock.token }}"

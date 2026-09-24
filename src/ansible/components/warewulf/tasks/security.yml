@@ -1,0 +1,26 @@
+---
+- name: Require verified release inputs before changing the head
+  ansible.builtin.assert:
+    that:
+      - warewulf_release_dir is match('^/var/lib/[A-Za-z0-9_/-]+$')
+      - "'..' not in warewulf_release_dir"
+      - warewulf_rpm_checksum is match('^sha256:[0-9a-f]{64}$')
+      - warewulf_image_source is match('^docker://[^ ]+@sha256:[0-9a-f]{64}$')
+    fail_msg: >-
+      Verified Warewulf RPM and OCI image SHA-256 digests and a safe release
+      directory under /var/lib are required.
+- name: Reject a redirected release directory before writing service guards
+  ansible.builtin.command:
+    argv: [realpath, -m, "{{ warewulf_release_dir }}"]
+  register: warewulf_release_realpath
+  changed_when: false
+  check_mode: false
+  failed_when: warewulf_release_realpath.rc != 0 or warewulf_release_realpath.stdout != warewulf_release_dir
+- name: Refuse an interrupted publication before modifying components
+  ansible.builtin.stat:
+    path: "{{ warewulf_release_dir }}/pending.json"
+  register: warewulf_pending_release
+- name: Require rollback of an interrupted publication
+  ansible.builtin.assert:
+    that: not warewulf_pending_release.stat.exists
+    fail_msg: Run core/playbooks/rollback.yml before retrying this interrupted publication.

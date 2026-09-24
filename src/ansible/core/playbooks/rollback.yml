@@ -1,0 +1,11 @@
+---
+- name: Restore the preceding served image and node release
+  hosts: headnode
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Restore the previous publication under the core lock
+      ansible.builtin.include_role:
+        name: hpc_core
+        tasks_from: rollback

@@ -1,0 +1,17 @@
+---
+- name: Create a local authentication credential
+  ansible.builtin.command:
+    argv: [munge, -n]
+  register: slurm_local_credential
+  changed_when: false
+  no_log: true
+- name: Require local Munge encoding and decoding to work
+  ansible.builtin.command:
+    argv: [unmunge]
+    stdin: "{{ slurm_local_credential.stdout }}"
+  changed_when: false
+  no_log: true
+- name: Release the local authentication credential
+  ansible.builtin.set_fact:
+    slurm_local_credential: {}
+  no_log: true

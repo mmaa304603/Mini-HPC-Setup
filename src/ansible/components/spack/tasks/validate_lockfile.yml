@@ -1,0 +1,29 @@
+---
+- name: Validate the saved Spack dependency plan before preserving it
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - |
+        import json, sys
+        path = sys.argv[1]
+        try:
+            with open(path) as stream:
+                data = json.load(stream)
+            if not isinstance(data, dict) or not isinstance(data.get('roots'), list) or not isinstance(data.get('concrete_specs'), dict):
+                raise ValueError('expected a Spack lockfile with roots and concrete_specs')
+        except (OSError, ValueError) as error:
+            sys.exit('Invalid Spack lockfile ' + path + ': ' + str(error) +
+                     '. Stop concurrent Spack runs, then restore a valid backup or move the corrupt file aside before retrying. Recreating it may change dependency versions. The installation database must be retained.')
+      - "{{ spack_environment_dir }}/spack.lock"
+  changed_when: false
+- name: Preserve the most recent valid dependency plan
+  become: true
+  become_user: "{{ spack_build_user }}"
+  ansible.builtin.copy:
+    src: "{{ spack_environment_dir }}/spack.lock"
+    dest: "{{ spack_environment_dir }}/spack.lock.last-good"
+    remote_src: true
+    mode: '0600'

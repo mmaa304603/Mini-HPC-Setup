@@ -1,0 +1,33 @@
+---
+- name: Require a normal test user
+  ansible.builtin.assert:
+    that:
+      - not ansible_check_mode
+      - slurm_verify_user != 'root'
+- name: Read the acceptance-test identity
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ slurm_verify_user }}"
+- name: Require a non-system UID for the test job
+  ansible.builtin.assert:
+    that: ansible_facts.getent_passwd[slurm_verify_user][1] | int >= 1000
+- name: Check head service health without starting services
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ item }}"]
+  loop: [chronyd, munge, slurmctld]
+  changed_when: false
+- name: Verify head time synchronization
+  ansible.builtin.import_tasks: time_check.yml
+- name: Verify head authentication
+  ansible.builtin.import_tasks: auth_check.yml
+- name: Read installed controller version
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}-%{RELEASE}', slurm]
+  register: slurm_verify_head_version
+  changed_when: false
+- name: Verify authentication and a job on each CPU node
+  ansible.builtin.include_tasks: verify_node.yml
+  loop: "{{ core_cluster.cpu_nodes }}"
+  loop_control:
+    loop_var: slurm_verify_node
+    label: "{{ slurm_verify_node.name }}"

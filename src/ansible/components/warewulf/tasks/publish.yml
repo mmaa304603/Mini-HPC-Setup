@@ -1,0 +1,188 @@
+---
+- name: Inspect image inputs before staging publication
+  ansible.builtin.import_tasks: publication_state.yml
+- name: Allocate a private copy of the current publication
+  hpc_release:
+    base: "{{ warewulf_release_dir }}"
+    state: begin
+  register: warewulf_release
+- name: Assign an immutable image name to this release
+  ansible.builtin.set_fact:
+    warewulf_release_image: "{{ core_cluster.cpu_image }}-{{ warewulf_release.release | basename }}"
+- name: Read the live Warewulf configuration
+  ansible.builtin.slurp:
+    src: /etc/warewulf/warewulf.conf
+  register: warewulf_live_config
+- name: Write configuration used only by staging commands
+  ansible.builtin.copy:
+    dest: "{{ warewulf_release.release }}/build.conf"
+    mode: '0600'
+    content: >-
+      {{ (warewulf_live_config.content | b64decode | from_yaml)
+         | combine({'paths': {'sysconfdir': warewulf_release.release ~ '/etc',
+                              'wwprovisiondir': warewulf_release.release ~ '/provision'}}, recursive=true)
+         | to_nice_yaml }}
+- name: Build a complete release without changing the served node database
+  environment:
+    WAREWULFCONF: "{{ warewulf_release.release }}/build.conf"
+  block:
+    - name: Stamp the image before building
+      ansible.builtin.command:
+        argv: [wwctl, image, exec, '--build=false', '--syncuser=false', "{{ core_cluster.cpu_image }}", --, /usr/bin/env, "HPC_HEAD_ROOT={{ hpc_head_root_identity }}", /bin/bash, -s]
+        stdin: |
+          {{ lookup('ansible.builtin.file', role_path ~ '/files/image-functions.sh') }}
+          put_file /etc/hpc-image-id 0644 root root <<'HPC_ID'
+          {{ warewulf_image_identity }}
+          HPC_ID
+          echo "HPC_CHANGED=$hpc_changed"
+      register: warewulf_stamp
+      changed_when: "'HPC_CHANGED=1' in warewulf_stamp.stdout"
+    - name: Create an immutable image snapshot directory
+      ansible.builtin.file:
+        path: "{{ warewulf_release.release }}/chroots/{{ warewulf_release_image }}"
+        state: directory
+        mode: '0700'
+    - name: Snapshot the prepared image including its matching kernel
+      ansible.builtin.command:
+        argv: [cp, -a, --reflink=auto, "{{ hpc_image_root }}", "{{ warewulf_release.release }}/chroots/{{ warewulf_release_image }}/rootfs"]
+      changed_when: true
+    - name: Expose the immutable image name to Warewulf kernel lookup
+      ansible.builtin.file:
+        src: "{{ warewulf_release.release }}/chroots/{{ warewulf_release_image }}"
+        dest: "/var/lib/warewulf/chroots/{{ warewulf_release_image }}"
+        state: link
+    - name: Reconcile CPU definitions in the staged database
+      ansible.builtin.include_tasks:
+        file: node.yml
+        apply:
+          no_log: true
+      vars:
+        warewulf_node_image: "{{ warewulf_release_image }}"
+      loop: "{{ core_cluster.cpu_nodes }}"
+      loop_control:
+        loop_var: warewulf_node
+        label: "{{ warewulf_node.name }}"
+    - name: Build the complete CPU image in the staging directory
+      ansible.builtin.command:
+        argv: [wwctl, image, build, --force, '--syncuser=false', "{{ warewulf_release_image }}"]
+      changed_when: true
+    - name: Build every selected overlay in the staging directory
+      ansible.builtin.command:
+        argv: [wwctl, overlay, build, "{{ item.name }}"]
+      loop: "{{ core_cluster.cpu_nodes }}"
+      changed_when: true
+    # `wwctl configure dhcp` writes the host overlay directly to /, even with
+    # WAREWULFCONF. Render to an explicit private output directory instead.
+    - name: Create the private host-overlay render directory
+      ansible.builtin.file:
+        path: "{{ warewulf_release.release }}/host"
+        state: directory
+        mode: '0700'
+    - name: Render DHCP configuration without applying a host overlay
+      ansible.builtin.command:
+        argv: [wwctl, overlay, build, --overlay, host, --output, "{{ warewulf_release.release }}/host", "{{ core_cluster.cpu_nodes[0].name }}"]
+      changed_when: true
+    - name: Select only the generated DHCP file from the private host overlay
+      ansible.builtin.copy:
+        src: "{{ warewulf_release.release }}/host/etc/dhcp/dhcpd.conf"
+        dest: "{{ warewulf_release.release }}/etc/dhcp/dhcpd.conf"
+        remote_src: true
+        mode: '0644'
+- name: Apply and validate the staged PXE lease policy before stopping services
+  ansible.builtin.include_tasks: dhcp_policy.yml
+  vars:
+    warewulf_dhcp_config_path: "{{ warewulf_release.release }}/etc/dhcp/dhcpd.conf"
+- name: Require complete staged overlays
+  ansible.builtin.stat:
+    path: "{{ warewulf_release.release }}/provision/overlays/{{ item.0.name }}/{{ item.1 }}.img.gz"
+  loop: "{{ core_cluster.cpu_nodes | product(['__SYSTEM__', '__RUNTIME__']) | list }}"
+  register: warewulf_staged_overlays
+- name: Check every overlay before activation
+  ansible.builtin.assert:
+    that:
+      - item.stat.isreg | default(false)
+      - item.stat.size | default(0) > 0
+  loop: "{{ warewulf_staged_overlays.results }}"
+  loop_control:
+    label: "{{ item.item.0.name }}/{{ item.item.1 }}"
+- name: Inspect the staged CPU archive
+  ansible.builtin.stat:
+    path: "{{ warewulf_release.release }}/provision/images/{{ warewulf_release_image }}.img.gz"
+    checksum_algorithm: sha256
+  register: warewulf_staged_archive
+- name: Require the staged image before activation
+  ansible.builtin.assert:
+    that:
+      - warewulf_staged_archive.stat.isreg | default(false)
+      - warewulf_staged_archive.stat.size | default(0) > 0
+- name: Record staged publication metadata
+  ansible.builtin.copy:
+    dest: "{{ warewulf_release.release }}/metadata/{{ core_cluster.cpu_image }}.json"
+    mode: '0600'
+    content: "{{ {'identity': warewulf_image_identity, 'archive_image': warewulf_release_image, 'archive_sha256': warewulf_staged_archive.stat.checksum} | to_nice_json }}\n"
+- name: Seal the complete image, overlays and node configuration
+  hpc_release:
+    base: "{{ warewulf_release_dir }}"
+    state: seal
+    release: "{{ warewulf_release.release }}"
+- name: Activate the release during a short provisioning maintenance window
+  block:
+    - name: Stop provisioning before switching configuration and archives
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop: [dhcpd, tftp.socket, tftp.service, warewulfd]
+    - name: Atomically select the complete staged release
+      hpc_release:
+        base: "{{ warewulf_release_dir }}"
+        state: activate
+        release: "{{ warewulf_release.release }}"
+    - name: Restore the DHCP configuration SELinux label before starting it
+      ansible.builtin.command:
+        argv: [/usr/sbin/restorecon, -F, /etc/dhcp/dhcpd.conf]
+      changed_when: false
+    - name: Start provisioning on the selected release
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+      loop: [warewulfd, tftp.socket, dhcpd]
+    - name: Verify selected publication and live services
+      ansible.builtin.import_tasks: verify_publication.yml
+    - name: Commit activation after its health checks
+      hpc_release:
+        base: "{{ warewulf_release_dir }}"
+        state: finish
+        release: "{{ warewulf_release.release }}"
+  rescue:
+    - name: Stop serving a failed activation
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+      loop: [dhcpd, tftp.socket, tftp.service, warewulfd]
+    - name: Inspect whether activation created a rollback record
+      ansible.builtin.stat:
+        path: "{{ warewulf_release_dir }}/pending.json"
+      register: warewulf_activation_pending
+    - name: Restore the preceding served release
+      hpc_release:
+        base: "{{ warewulf_release_dir }}"
+        state: rollback
+      when: warewulf_activation_pending.stat.exists
+    - name: Check restored artifacts before restarting provisioning
+      hpc_release:
+        base: "{{ warewulf_release_dir }}"
+        state: verify
+      when: warewulf_activation_pending.stat.exists
+    - name: Restore the rolled-back DHCP configuration SELinux label
+      ansible.builtin.command:
+        argv: [/usr/sbin/restorecon, -F, /etc/dhcp/dhcpd.conf]
+      when: warewulf_activation_pending.stat.exists
+      changed_when: false
+    - name: Restart provisioning after restoring the preceding release
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: started
+      loop: [warewulfd, tftp.socket, dhcpd]
+    - name: Fail deployment after publication recovery
+      ansible.builtin.fail:
+        msg: Publication activation failed. The previous served release was restored when available; inspect service logs before retrying. No success checkpoint was written.

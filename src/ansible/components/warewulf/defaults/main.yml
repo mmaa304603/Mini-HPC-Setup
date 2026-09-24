@@ -1,17 +1,17 @@
 ---
-# Network configuration
-network_ip: 10.0.0.1
-network_mask: 255.255.252.0
-network: 10.0.0.0
-dhcp_start: 10.0.1.1
-dhcp_end: 10.0.1.255
-
-# Node configuration
-compute_01_ip: 10.0.2.1
-compute_01_mac: 00:00:00:00:00:01
-compute_02_ip: 10.0.2.2
-compute_02_mac: 00:00:00:00:00:02
-compute_03_ip: 10.0.2.3
-compute_03_mac: 00:00:00:00:00:03
-gpu_01_ip: 10.0.2.4
-gpu_01_mac: 00:00:00:00:00:04 
+warewulf_version: "4.6.4"
+warewulf_rpm_url: "https://github.com/warewulf/warewulf/releases/download/v{{ warewulf_version }}/warewulf-{{ warewulf_version }}-1.el9.x86_64.rpm"
+# Official GitHub release asset digest, verified 2026-09-19.
+warewulf_rpm_checksum: sha256:cead78f86033a5c5ce2d309a562ce21d70dbd4c171d1c1935b66c693909893cb
+warewulf_image_digests:
+  '9.5': sha256:2bfc5d9648ae4f1828409985fef859f7e530b976e5ff5234b92fe39feaa3efba
+  '9.6': sha256:b55fc67aa6948f3e0117913b42ef2e07b7ceb01b750651e9383cb1b6bdf9d5c9
+warewulf_image_source: "docker://ghcr.io/warewulf/warewulf-rockylinux@{{ warewulf_image_digests.get(core_cluster.cpu_image | regex_replace('^rockylinux-', ''), '') }}"
+warewulf_cluster_zone: hpc-cluster
+warewulf_compute_dns: ["1.1.1.1", "8.8.8.8"]
+# Public keys only. Supply the controller user's existing public key(s).
+warewulf_authorized_keys: []
+warewulf_system_overlays: [wwinit, wwclient, hostname, systemd.netname, NetworkManager]
+warewulf_runtime_overlays: [hosts]
+warewulf_spack_export: "{{ spack_install_dir | default('/opt/spack') }}"
+warewulf_release_dir: /var/lib/hpc-setup/releases

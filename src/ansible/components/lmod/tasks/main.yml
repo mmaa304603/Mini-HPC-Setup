@@ -1,0 +1,4 @@
+---
+- name: Require the phased core entry point
+  ansible.builtin.fail:
+    msg: Use core/playbooks/site.yml; Lmod consumes the Spack environment and CPU image.

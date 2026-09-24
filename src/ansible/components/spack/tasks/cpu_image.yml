@@ -1,0 +1,14 @@
+---
+- name: Validate the CPU image execution context
+  ansible.builtin.include_role:
+    name: "{{ role_path }}/../warewulf"
+    tasks_from: image_context
+- name: Configure software access in the image without mounting on the head
+  ansible.builtin.command:
+    argv: [wwctl, image, exec, '--build=false', '--syncuser=false', "{{ core_cluster.cpu_image }}", --, /usr/bin/env, "HPC_HEAD_ROOT={{ hpc_head_root_identity }}", /bin/bash, -s]
+    stdin: |
+      {{ lookup('ansible.builtin.file', role_path ~ '/../warewulf/files/image-functions.sh') }}
+      {{ lookup('ansible.builtin.template', 'cpu-image.sh.j2') }}
+  register: spack_image_result
+  changed_when: "'HPC_CHANGED=1' in spack_image_result.stdout"
+  failed_when: spack_image_result.rc != 0 or spack_image_result.stdout is not search('(?m)^HPC_CHANGED=[01]$')
