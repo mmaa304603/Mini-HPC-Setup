@@ -1,0 +1,20 @@
+---
+- name: Run a bounded CUDA kernel and validate its result as the SSH user
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/timeout
+      - --kill-after=5
+      - "{{ jetson_cuda_timeout | string }}"
+      - /usr/bin/python3
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/cuda_check.py') }}"
+  become: false
+  environment:
+    CUDA_CACHE_DISABLE: '1'
+  register: jetson_cuda_result
+  changed_when: false
+  check_mode: false
+
+- name: Report the tested CUDA device
+  ansible.builtin.debug:
+    msg: "{{ jetson_cuda_result.stdout }}"

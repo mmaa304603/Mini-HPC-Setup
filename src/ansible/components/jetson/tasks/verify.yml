@@ -1,0 +1,63 @@
+---
+- name: Require the configured hostname
+  ansible.builtin.command:
+    argv: [hostname, -s]
+  register: jetson_hostname
+  changed_when: false
+  failed_when: jetson_hostname.rc != 0 or jetson_hostname.stdout != inventory_hostname
+
+- name: Verify installed baseline packages
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, '-f=${db:Status-Status}', "{{ item }}"]
+  loop: [ca-certificates, chrony, nfs-common]
+  register: jetson_package
+  changed_when: false
+  failed_when: jetson_package.rc != 0 or jetson_package.stdout != 'installed'
+
+- name: Recheck service identities
+  ansible.builtin.import_tasks: identities_check.yml
+
+- name: Require all shared service accounts to exist
+  ansible.builtin.assert:
+    that:
+      - item.name in ansible_facts.getent_passwd
+      - item.group in ansible_facts.getent_group
+  loop: "{{ gpu_cluster.service_users }}"
+
+- name: Require an active time service
+  ansible.builtin.command:
+    argv: [systemctl, is-active, chrony]
+  changed_when: false
+
+- name: Require the time service to start at boot
+  ansible.builtin.command:
+    argv: [systemctl, is-enabled, chrony]
+  changed_when: false
+
+- name: Wait for a synchronized Jetson clock
+  ansible.builtin.command:
+    argv: [chronyc, waitsync, '1', '1.0', '0.0', '1']
+  register: jetson_clock
+  changed_when: false
+  until: jetson_clock.rc == 0
+  retries: 12
+  delay: 5
+
+- name: Read the selected Jetson NTP source
+  ansible.builtin.command:
+    argv: [chronyc, -n, sources]
+  register: jetson_time_sources
+  changed_when: false
+
+- name: Require synchronization with the head
+  ansible.builtin.assert:
+    that: >-
+      (jetson_time_sources.stdout_lines | select('match', '^\^\*\s+') |
+      map('split') | map(attribute=1) | list) == [gpu_cluster.head.address]
+    fail_msg: The Jetson must synchronize with the head; check its NTP service and UDP 123 access.
+
+- name: Recheck the GPU network
+  ansible.builtin.import_tasks: network_check.yml
+
+- name: Execute CUDA as the normal SSH user
+  ansible.builtin.import_tasks: cuda_check.yml

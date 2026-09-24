@@ -1,0 +1,31 @@
+---
+- name: Read GPU interface addresses
+  ansible.builtin.command:
+    argv: [ip, -j, -4, address, show]
+  register: jetson_addresses
+  changed_when: false
+  check_mode: false
+
+- name: Read GPU default routes
+  ansible.builtin.command:
+    argv: [ip, -j, -4, route, show, table, all, default]
+  register: jetson_routes
+  changed_when: false
+  check_mode: false
+
+- name: Require the inventory address and routing through the head
+  ansible.builtin.assert:
+    that:
+      - >-
+        (jetson_addresses.stdout | from_json | map(attribute='addr_info') | flatten |
+        selectattr('local', 'equalto', ansible_host) |
+        selectattr('prefixlen', 'equalto', gpu_cluster.network.prefix) | list | length) == 1
+      - jetson_routes.stdout | from_json | length > 0
+      - >-
+        (jetson_routes.stdout | from_json | selectattr('gateway', 'defined') |
+        selectattr('gateway', 'equalto', gpu_cluster.head.address) | list | length)
+        == (jetson_routes.stdout | from_json | length)
+    fail_msg: >-
+      Configure {{ ansible_host }}/{{ gpu_cluster.network.prefix }} and default
+      gateway {{ gpu_cluster.head.address }} persistently on the Jetson first.
+      This workflow checks networking without replacing an active SSH connection.

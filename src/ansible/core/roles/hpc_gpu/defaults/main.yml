@@ -1,0 +1,4 @@
+---
+gpu_action: deploy                    # plan | preflight | deploy | verify
+gpu_components_dir: "{{ playbook_dir }}/../../components"
+gpu_connection_timeout: 60

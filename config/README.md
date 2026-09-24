@@ -1,11 +1,13 @@
 # Cluster configuration
 
-One physical cluster uses two deployment files:
+One physical cluster uses a shared inventory and group-specific settings:
 
 ```text
 config/
 ├── hosts.yml             # Node inventory and per-node hardware settings
-└── group_vars/all.yml    # Shared deployment overrides
+└── group_vars/
+    ├── all.yml          # Shared deployment overrides
+    └── gpu_nodes.yml    # Jetson SSH login and optional baseline overrides
 ```
 
 `hosts.yml` contains the README's one local head, three diskless CPU nodes and
@@ -13,7 +15,10 @@ one preinstalled GPU node. Verify the CPU PXE NIC MACs, usable Slurm memory,
 CPU topology and SSH connection settings before deployment. CPU memory is
 7000 MB per node, matching `SLURM_DEFAULT_MEM` in the shell Slurm configuration;
 override it per host if hardware differs.
-The GPU address is reserved but the initial core workflow configures CPUs only.
+The CPU core workflow configures CPUs only. The separate
+[GPU entrypoint](../src/ansible/components/jetson/README.md) initializes the
+preinstalled Jetson over SSH. Set its normal `ansible_user` in `gpu_nodes.yml`
+before using live GPU actions; its static address remains in `hosts.yml`.
 
 `group_vars/all.yml` selects Warewulf, Slurm, Spack and Lmod, the DHCP range and
 CPU image, and software overrides. Ansible automatically loads this file next

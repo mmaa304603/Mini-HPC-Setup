@@ -1,0 +1,22 @@
+---
+- name: Validate the existing head for GPU initialization
+  hosts: headnode
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Check the GPU workflow and head prerequisites
+      ansible.builtin.import_role:
+        name: hpc_gpu
+        tasks_from: head
+      tags: [always]
+
+- name: Initialize the preinstalled Jetson nodes
+  hosts: gpu_nodes
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  serial: 1
+  roles:
+    - role: hpc_gpu
+      tags: [always]

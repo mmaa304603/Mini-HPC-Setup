@@ -1,0 +1,70 @@
+---
+- name: Require an SSH managed GPU from the head contract
+  ansible.builtin.assert:
+    that:
+      - gpu_cluster is defined
+      - inventory_hostname in (gpu_cluster.gpu_nodes | map(attribute='name') | list)
+      - inventory_hostname != gpu_cluster.head.name
+      - ansible_connection | default('ssh') == 'ssh'
+      - ansible_user is defined and ansible_user != 'root'
+
+- name: Gather Jetson operating system facts
+  ansible.builtin.setup:
+    gather_subset: ['!all', min]
+
+- name: Require the original Ubuntu ARM architecture
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '22.04'
+      - ansible_facts.architecture == 'aarch64'
+      - ansible_facts.user_id == 'root'
+    fail_msg: GPU initialization requires Ubuntu 22.04 aarch64 with working sudo on the Jetson.
+
+- name: Read the Jetson board model
+  ansible.builtin.slurp:
+    src: /proc/device-tree/model
+  register: jetson_board
+
+- name: Read the installed NVIDIA BSP version
+  ansible.builtin.command:
+    argv: [dpkg-query, -W, '-f=${Version}', nvidia-l4t-core]
+  register: jetson_bsp
+  changed_when: false
+  check_mode: false
+
+- name: Require an Orin Nano with the JetPack 6 BSP
+  ansible.builtin.assert:
+    that:
+      - "'Jetson Orin Nano' in (jetson_board.content | b64decode)"
+      - jetson_bsp.stdout is match('^36\.')
+    fail_msg: >-
+      Expected an Orin Nano running JetPack 6 / L4T 36.x. Flash and validate
+      JetPack separately; this playbook preserves the installed NVIDIA stack.
+
+- name: Validate the existing private network
+  ansible.builtin.import_tasks: network_check.yml
+
+- name: Check DNS for Ubuntu ARM package access
+  ansible.builtin.command:
+    argv: [getent, ahostsv4, "{{ jetson_dns_probe }}"]
+  changed_when: false
+  check_mode: false
+
+- name: Read available Jetson root storage
+  ansible.builtin.command:
+    argv: [df, -B1, --output=avail, /]
+  register: jetson_free_bytes
+  changed_when: false
+  check_mode: false
+
+- name: Require room for baseline packages
+  ansible.builtin.assert:
+    that: (jetson_free_bytes.stdout_lines | last | trim | int) >= (jetson_min_free_bytes | int)
+    fail_msg: Free at least {{ jetson_min_free_bytes }} bytes on the Jetson root filesystem.
+
+- name: Check service identity collisions before installing packages
+  ansible.builtin.import_tasks: identities_check.yml
+
+- name: Check the existing CUDA driver and login-user device access
+  ansible.builtin.import_tasks: cuda_check.yml

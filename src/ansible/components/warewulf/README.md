@@ -128,8 +128,14 @@ switches the served release. The preceding bundle remains available while the
 new release starts and is verified, so activation failure can restore it. After a
 successful commit, stale bundles are deleted and only the active release remains.
 There is no historical release available for rollback after that commit.
-Staging copies the current provision tree, so older archives can remain inside
-the active bundle; one release directory does not guarantee one image archive.
+Staging omits previous `.img`/`.img.gz` archives for the CPU image being replaced,
+including its generated release names, before copying the provision tree.
+Unrelated images are preserved. Cleanup removes orphaned chroot symlinks whose
+exact targets belong to deleted managed releases. After successful publication,
+the managed CPU image has one working directory and one active release link.
+The active snapshot is retained while the next snapshot and archive are built,
+so temporary space for both releases is still necessary. Legacy migration
+backups (`*.before-core-*`) are not removed by this cleanup.
 This does not roll back installed head packages or the mutable working image.
 Disk capacity and actual service/SELinux/PXE acceptance
 must be checked on the target system. Core's minimum free-space check is not

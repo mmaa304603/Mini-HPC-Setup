@@ -29,7 +29,7 @@ See [component deployment inputs](../components/README.md) before installation.
 
 ## Configuration
 
-Edit the two deployment files described in [config/README.md](../../../config/README.md):
+For CPU deployment, edit the two files described in [config/README.md](../../../config/README.md):
 
 - `config/hosts.yml`: groups, addresses, actual CPU PXE MACs, and hardware values;
 - `config/group_vars/all.yml`: components, versions, DHCP range, image and software settings.
@@ -56,8 +56,10 @@ DHCP does not reserve the final static addresses. This matches the shell flow.
 Set warewulf_authorized_keys to the controller's existing public SSH keys and
 review compute DNS. No firmware tags or provisioning Vault file are required.
 
-The configured CPU image is `rockylinux-9.5`. GPU inventory entries reserve addresses only: core does not
-provision GPU operating systems, images or drivers.
+The configured CPU image is `rockylinux-9.5`. The CPU entrypoint reserves GPU
+addresses without provisioning GPU images or drivers. The separate
+[GPU initialization entrypoint](../components/jetson/README.md) manages the
+preinstalled Jetson over SSH.
 
 Slurm uses setup's existing administrator as its normal
 test-job user; slurm_verify_user may select another existing normal head user.
@@ -176,8 +178,35 @@ ansible-playbook core/playbooks/verify.yml -K \
 Warewulf is required. Other supported selections are Slurm, Spack and Lmod;
 Lmod requires Spack. Selection does not uninstall previously installed components.
 With the default `core_stage=full`, all required phases for selected components
-run in the declared order. GPU,
-ELK, Grafana, Apptainer, eRaider and Globus are outside this milestone.
+run in the declared order. GPU scheduling, ELK, Grafana, Apptainer, eRaider and
+Globus are outside this milestone.
+
+### GPU initialization entrypoint
+
+`core/playbooks/gpu.yml` is an opt-in flow for the SSD-booted Orin Nano. It uses
+`hpc_gpu` to validate the head handoff, then runs the `jetson` component over
+SSH: preflight, baseline installation, handler flushing, and local acceptance.
+`gpu_action=plan` is offline; `preflight` checks prerequisites; `deploy` is the
+default; `verify` checks current state without installing anything. The
+`gpu-verify.yml` wrapper selects verification.
+
+```bash
+ansible-playbook core/playbooks/gpu.yml -e gpu_action=plan
+ansible-playbook core/playbooks/gpu.yml -e gpu_action=preflight -K
+ansible-playbook core/playbooks/gpu.yml -K
+ansible-playbook core/playbooks/gpu-verify.yml -K
+```
+
+Set the JetPack SSH login in `config/group_vars/gpu_nodes.yml` first. The head
+must already route traffic and serve synchronized NTP to the cluster. The
+Jetson needs persistent static networking, Python, SSH/sudo and working CUDA.
+Live checks reuse the existing head contract and CPU inventory validation,
+without requiring CPU image capacity or Slurm resource values.
+
+GPU initialization has no skip flags: reruns reconcile state and test a CUDA
+kernel as the normal SSH user. It does not enroll the node in Slurm or publish
+CPU images. See the [Jetson guide](../components/jetson/README.md) for the exact
+baseline, supported platform, credentials, failure recovery and verification.
 
 ### Software order and maintenance
 
@@ -312,10 +341,15 @@ deletes every stale `release-*` directory, leaving one active bundle. When a
 valid active release exists, abandoned staging directories are also removed
 before allocating the next publication.
 After commit, `previous` also points to the active bundle: rollback does not
-provide historical releases after a successful deployment. One retained bundle
-does not guarantee one archive or fixed disk usage: staging copies the current
-provision tree, which can carry older image archives into the retained bundle.
-Do not interpret release-directory cleanup as a complete image-cache cleanup.
+provide historical releases after a successful deployment. Staging excludes
+the CPU image's previous `.img`/`.img.gz` archives, including generated
+`<image>-release-<32-hex-ID>` versions, before copying the provision tree.
+Unrelated image archives are preserved. Cleanup also removes orphaned chroot
+symlinks pointing into deleted managed releases; it never deletes the working
+image directory. Expect one working image plus one active release image link
+after successful publication. The next build still needs temporary space for
+the new snapshot and archive while the active release remains available.
+Legacy `*.before-core-*` migration backups are not removed by this cleanup.
 An unchanged publication phase can be skipped through validated resume receipts.
 If activation was interrupted and a preceding release is available, stop any
 other deployment and use the locked recovery entry point from `src/ansible`:
@@ -386,7 +420,10 @@ core/
 ├── playbooks/
 │   ├── site.yml
 │   ├── verify.yml
-│   └── rollback.yml
+│   ├── rollback.yml
+│   ├── gpu.yml                   # Opt-in Jetson initialization
+│   └── gpu-verify.yml
+├── roles/hpc_gpu/                # Head handoff and SSH GPU orchestration
 ├── roles/hpc_core/
 │   ├── defaults/main.yml          # Overridable orchestration inputs
 │   ├── vars/main.yml              # Ordered deployment/verification phases

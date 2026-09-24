@@ -14,5 +14,7 @@ export PYTHONDONTWRITEBYTECODE=1
 ansible-playbook "${CORE_TEST_DIR}/../playbooks/site.yml" --syntax-check
 ansible-playbook "${CORE_TEST_DIR}/../playbooks/verify.yml" --syntax-check
 ansible-playbook "${CORE_TEST_DIR}/../playbooks/rollback.yml" --syntax-check
+ansible-playbook "${CORE_TEST_DIR}/../playbooks/gpu.yml" --syntax-check
+ansible-playbook "${CORE_TEST_DIR}/../playbooks/gpu-verify.yml" --syntax-check
 ansible-inventory --graph
 python3 -m unittest discover -s "$CORE_TEST_DIR" -p 'test_*.py' -v

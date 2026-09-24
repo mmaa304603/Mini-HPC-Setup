@@ -5,6 +5,7 @@
   hpc_release:
     base: "{{ warewulf_release_dir }}"
     state: begin
+    replace_image: "{{ core_cluster.cpu_image }}"
   register: warewulf_release
 - name: Assign an immutable image name to this release
   ansible.builtin.set_fact:

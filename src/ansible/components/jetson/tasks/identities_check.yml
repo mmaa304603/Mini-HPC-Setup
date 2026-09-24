@@ -1,0 +1,26 @@
+---
+- name: Read Jetson account and group assignments
+  ansible.builtin.getent:
+    database: "{{ item }}"
+  loop: [passwd, group]
+
+- name: Refuse service identity renumbering and occupied numeric IDs
+  ansible.builtin.assert:
+    that:
+      - >-
+        item.name not in ansible_facts.getent_passwd or
+        (ansible_facts.getent_passwd[item.name][1] | int == item.uid and
+        ansible_facts.getent_passwd[item.name][2] | int == item.gid)
+      - >-
+        item.group not in ansible_facts.getent_group or
+        ansible_facts.getent_group[item.group][1] | int == item.gid
+      - >-
+        (ansible_facts.getent_passwd | dict2items | rejectattr('key', 'equalto', item.name) |
+        selectattr('value.1', 'equalto', item.uid | string) | list | length) == 0
+      - >-
+        (ansible_facts.getent_group | dict2items | rejectattr('key', 'equalto', item.group) |
+        selectattr('value.1', 'equalto', item.gid | string) | list | length) == 0
+    fail_msg: >-
+      {{ item.name }} conflicts with the head's UID/GID contract. Resolve this
+      explicitly; initialization will not renumber existing Jetson accounts.
+  loop: "{{ gpu_cluster.service_users }}"

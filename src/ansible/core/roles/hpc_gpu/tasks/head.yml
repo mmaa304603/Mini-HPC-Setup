@@ -1,0 +1,78 @@
+---
+- name: Validate the GPU workflow before connecting to hosts
+  ansible.builtin.assert:
+    that:
+      - gpu_action in ['plan', 'preflight', 'deploy', 'verify']
+      - groups.get('headnode', []) | length == 1
+      - groups.get('gpu_nodes', []) | length > 0
+      - groups.get('headnode', []) | intersect(groups.get('gpu_nodes', [])) | length == 0
+      - groups.get('cpu_nodes', []) | intersect(groups.get('gpu_nodes', [])) | length == 0
+      - ansible_run_tags == ['all']
+      - ansible_skip_tags | length == 0
+      - ansible_limit | default('') | length == 0
+      - not ansible_check_mode or gpu_action in ['plan', 'preflight']
+    fail_msg: >-
+      GPU initialization requires one head and a separate, nonempty gpu_nodes
+      group. Use gpu_action=plan or preflight for previews. Partial runs through
+      tags or --limit and deployment/verification in check mode are unsupported.
+
+- name: Require explicit Jetson SSH inventory
+  ansible.builtin.assert:
+    that:
+      - hostvars[item].cluster_architecture | default('') == 'aarch64'
+      - hostvars[item].ansible_connection | default('ssh') == 'ssh'
+      - gpu_action == 'plan' or hostvars[item].ansible_user | default('') is match('^[a-z_][a-z0-9_-]*$')
+      - gpu_action == 'plan' or hostvars[item].ansible_user | default('root') != 'root'
+      - hostvars[item].ansible_host | default('') | length > 0
+    fail_msg: >-
+      {{ item }} needs cluster_architecture=aarch64, its static ansible_host,
+      and an explicit normal ansible_user with SSH access and sudo. Set these
+      in config/hosts.yml or config/group_vars/gpu_nodes.yml after flashing JetPack.
+  loop: "{{ groups['gpu_nodes'] }}"
+
+- name: Check Jetson component entry points on the controller
+  ansible.builtin.assert:
+    that: (gpu_components_dir ~ '/jetson/tasks/' ~ item ~ '.yml') is file
+    fail_msg: "Missing Jetson component entry point: {{ item }}"
+  loop: [preflight, deploy, verify]
+
+- name: Report the GPU initialization plan
+  ansible.builtin.debug:
+    msg:
+      action: "{{ gpu_action }}"
+      nodes: "{{ groups['gpu_nodes'] }}"
+      phases: [head_handoff, jetson_preflight, jetson_baseline, jetson_verification]
+      scope: Ubuntu 22.04 / JetPack 6 Orin Nano initialization and local CUDA acceptance
+      prerequisites: Static networking, Python, SSH/sudo and working JetPack CUDA must already exist.
+      scheduling: Slurm enrollment and ARM Spack/Lmod are separate future stages.
+
+- name: Read and validate the existing head contract
+  ansible.builtin.include_role:
+    name: hpc_core
+    tasks_from: preflight
+    public: false
+  vars:
+    # Reuse read-only handoff/OS/network/identity checks, without CPU capacity
+    # checks or requiring Slurm hardware values for GPU initialization.
+    core_action: verify
+    core_components: [warewulf]
+  when: gpu_action != 'plan'
+
+- name: Require the existing head time service before changing the Jetson
+  ansible.builtin.command:
+    argv: [systemctl, is-active, chronyd]
+  changed_when: false
+  check_mode: false
+  when: gpu_action != 'plan'
+
+- name: Require the head clock to be synchronized
+  ansible.builtin.command:
+    argv: [chronyc, waitsync, '1', '1.0', '0.0', '1']
+  changed_when: false
+  check_mode: false
+  when: gpu_action != 'plan'
+
+- name: Pass the validated head contract to the GPU play
+  ansible.builtin.set_fact:
+    gpu_cluster: "{{ core_cluster }}"
+  when: gpu_action != 'plan'

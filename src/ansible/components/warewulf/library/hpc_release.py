@@ -8,6 +8,7 @@ No package, rootfs or controller-service rollback is implied.
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -91,7 +92,37 @@ def selected_release(base):
     return selected
 
 
-def retain_only(base, release):
+def clean_chroot_links(base, chroot_dir):
+    """Unlink only orphaned aliases created by this publisher, never rootfs trees."""
+    if not chroot_dir:
+        return
+    root = Path(chroot_dir)
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError('Chroot directory must be a real directory')
+    for entry in root.iterdir():
+        match = re.fullmatch(r'.+-(release-[0-9a-f]{32})', entry.name)
+        if not match or not entry.is_symlink():
+            continue
+        target = base / match.group(1) / 'chroots' / entry.name
+        if os.readlink(entry) == str(target) and not target.parent.parent.exists():
+            entry.unlink()
+
+
+def archive_ignore(source, image):
+    """Do not inherit the image being replaced or its generated release archives."""
+    images = Path(source) / 'images'
+    pattern = re.compile(re.escape(image) + r'(?:-release-[0-9a-f]{32})?\.img(?:\.gz)?')
+
+    def ignore(directory, names):
+        if Path(directory) != images:
+            return []
+        return [name for name in names if pattern.fullmatch(name)
+                and (Path(directory) / name).is_file()
+                and not (Path(directory) / name).is_symlink()]
+    return ignore
+
+
+def retain_only(base, release, chroot_dir=None):
     """Keep one selected release after rollback is no longer required."""
     if release.parent != base or not release.is_dir():
         raise ValueError('Cannot retain an invalid release')
@@ -105,6 +136,7 @@ def retain_only(base, release):
             raise ValueError('Unexpected release entry: ' + str(candidate))
         shutil.rmtree(candidate)
     sync_directory(base)
+    clean_chroot_links(base, chroot_dir)
 
 
 def manifest(directory):
@@ -124,7 +156,8 @@ def manifest(directory):
     return entries
 
 
-def execute(base, state, release='', layout=None, etc_source='/etc/warewulf'):
+def execute(base, state, release='', layout=None, etc_source='/etc/warewulf',
+            chroot_dir=None, replace_image=''):
     layout = layout or LAYOUT
     base = Path(base)
     if not base.is_absolute() or str(base.resolve()) != str(base) or str(base) == '/':
@@ -141,7 +174,9 @@ def execute(base, state, release='', layout=None, etc_source='/etc/warewulf'):
         if active is not None:
             # Clean abandoned staging directories before allocating another
             # full image snapshot. The active release remains available.
-            retain_only(base, active)
+            retain_only(base, active, chroot_dir)
+        else:
+            clean_chroot_links(base, chroot_dir)
         directory = base / ('release-' + uuid.uuid4().hex)
         directory.mkdir(mode=0o700)
         shutil.copytree(etc_source, directory / 'etc/warewulf', symlinks=False)
@@ -151,7 +186,8 @@ def execute(base, state, release='', layout=None, etc_source='/etc/warewulf'):
                 continue
             destination.parent.mkdir(parents=True, exist_ok=True)
             if Path(source).is_dir():
-                shutil.copytree(source, destination, symlinks=False)
+                ignore = archive_ignore(source, replace_image) if relative == 'provision' and replace_image else None
+                shutil.copytree(source, destination, symlinks=False, ignore=ignore)
             elif Path(source).is_file():
                 shutil.copy2(source, destination)
             elif relative in ('provision', 'metadata'):
@@ -209,7 +245,7 @@ def execute(base, state, release='', layout=None, etc_source='/etc/warewulf'):
         if not pending.exists() or json.loads(pending.read_text())['release'] != str(directory):
             raise ValueError('Publication ownership mismatch')
         pending.unlink()
-        retain_only(base, directory)
+        retain_only(base, directory, chroot_dir)
     return dict(changed=state != 'verify', release=str(directory))
 
 
@@ -239,7 +275,9 @@ def bind_layout(base, name, layout):
 def main():
     module = AnsibleModule(argument_spec=dict(base=dict(type='path', required=True),
         state=dict(choices=['begin', 'seal', 'activate', 'verify', 'rollback', 'finish'], required=True),
-        release=dict(type='path', default='')))
+        release=dict(type='path', default=''),
+        chroot_dir=dict(type='path', default='/var/lib/warewulf/chroots'),
+        replace_image=dict(type='str', default='')))
     try:
         module.exit_json(**execute(**module.params))
     except (OSError, ValueError, KeyError) as exc:

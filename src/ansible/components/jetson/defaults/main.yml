@@ -1,0 +1,4 @@
+---
+jetson_min_free_bytes: 2147483648
+jetson_dns_probe: ports.ubuntu.com
+jetson_cuda_timeout: 30

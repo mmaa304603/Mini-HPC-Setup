@@ -1,0 +1,4 @@
+---
+- ansible.builtin.import_playbook: gpu.yml
+  vars:
+    gpu_action: verify

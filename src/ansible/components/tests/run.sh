@@ -22,6 +22,7 @@ for role, phases in {
     "slurm": ["head", "cpu_image", "verify"],
     "spack": ["head", "cpu_image", "verify"],
     "lmod": ["head", "cpu_image", "verify"],
+    "jetson": ["preflight", "deploy", "verify"],
 }.items():
     for phase in phases:
         tasks.append({"ansible.builtin.import_role": {

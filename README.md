@@ -19,9 +19,10 @@ Only the head node is connected to the public network. All compute nodes are con
 - **Static Node Addresses**: 
   - 10.0.2.1 - 10.0.2.3 (CPU compute nodes)
   - 10.0.2.4 (GPU compute node)
-- **SLURM Configuration**: Uses 10.0.2.1 - 10.0.2.4 for node management
+- **SLURM Configuration**: The current Ansible core manages CPU nodes at 10.0.2.1 - 10.0.2.3; GPU scheduler enrollment is a later stage.
 
-These network settings are configured and utilized in Warewulf for provisioning and PXE booting.
+Warewulf provisions and PXE-boots CPU nodes. The SSD-booted Jetson uses a
+persistent static network configuration and is managed over SSH.
 
 ## Setup Flow
 
@@ -37,6 +38,24 @@ These network settings are configured and utilized in Warewulf for provisioning 
 5. Configure Lmod to load packages for users
 6. Set up logging management (ELK stack)
 7. Configure system monitoring (MonSTER + Grafana)
+
+### GPU node initialization
+
+After flashing JetPack 6 on the Orin Nano, configure its static networking,
+SSH key access and sudo, then set `ansible_user` in
+`config/group_vars/gpu_nodes.yml`. From `src/ansible`:
+
+```bash
+ansible-playbook core/playbooks/gpu.yml -e gpu_action=plan
+ansible-playbook core/playbooks/gpu.yml -e gpu_action=preflight -K
+ansible-playbook core/playbooks/gpu.yml -K
+ansible-playbook core/playbooks/gpu-verify.yml -K
+```
+
+This separate flow initializes the Ubuntu/ARM baseline and verifies a local
+CUDA kernel. See the [Jetson guide](src/ansible/components/jetson/README.md) for
+head-service prerequisites, credentials, reruns and scope. Slurm GPU enrollment
+and ARM software environments are not implemented by this entrypoint.
 
 ## Project Structure
 

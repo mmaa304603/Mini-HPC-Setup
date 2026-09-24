@@ -1,0 +1,5 @@
+# Managed by Mini-HPC GPU initialization.
+server {{ gpu_cluster.head.address }} iburst
+driftfile /var/lib/chrony/chrony.drift
+makestep 1.0 3
+rtcsync

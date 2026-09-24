@@ -11,10 +11,12 @@ to use core instead. They are not standalone installation entry points.
 | [Slurm](slurm/README.md) | head, cpu_image, verify |
 | [Spack](spack/README.md) | head, cpu_image, verify |
 | [Lmod](lmod/README.md) | head, cpu_image, verify |
+| [Jetson](jetson/README.md) | preflight, deploy, verify (separate GPU entrypoint) |
 
 The existing Apptainer, ELK, Grafana, Globus and
-eRaider roles have not been revised as part of this milestone. No GPU deployment
-entry point is included.
+eRaider roles have not been revised as part of this milestone. The optional
+`core/playbooks/gpu.yml` entrypoint initializes the preinstalled Jetson and
+verifies local CUDA execution. GPU scheduler enrollment remains a later stage.
 
 ## Initialization order and responsibilities
 
@@ -55,7 +57,8 @@ uses inventory MACs on an isolated trusted network, without asset keys.
 Configure the repository's [shared deployment files](../../../config/README.md):
 
 - `config/hosts.yml`: actual CPU MAC/IP addresses, architecture, and Slurm CPU
-  topology and usable memory. GPU entries currently reserve addresses only.
+  topology and usable memory. GPU entries supply the SSH address and architecture
+  for the separate initialization flow; set its login in `group_vars/gpu_nodes.yml`.
 - `config/group_vars/all.yml`: selected components, image/package settings and
   `warewulf_authorized_keys` containing the controller user's public SSH keys.
   Review `warewulf_compute_dns` for your network.
@@ -129,8 +132,10 @@ Use `-e core_resume=false` for a full reconciliation. Shell component flags do
 not substitute for these receipts.
 
 After successful publication, only the active release directory is retained.
-Historical rollback is unavailable after commit, and copied older archives
-inside the active provision tree can still consume space. See the core README's
+Historical rollback is unavailable after commit. Staging excludes older archives
+for the CPU image being replaced, and cleanup removes orphaned managed chroot
+links. The working image, active snapshot and unrelated images are preserved.
+Legacy migration backups remain outside this cleanup. See the core README's
 [recovery guidance](../core/README.md#recovery-and-verification) for publication
 boundaries, interrupted-run recovery and storage limitations.
 

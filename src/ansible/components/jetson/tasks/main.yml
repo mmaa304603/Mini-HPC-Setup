@@ -1,0 +1,4 @@
+---
+- name: Require the GPU orchestration entry point
+  ansible.builtin.fail:
+    msg: Use core/playbooks/gpu.yml to initialize the Jetson.

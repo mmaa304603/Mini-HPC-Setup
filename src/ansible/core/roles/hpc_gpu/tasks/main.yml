@@ -1,0 +1,53 @@
+---
+- name: Require the head stage before accessing a Jetson
+  ansible.builtin.assert:
+    that:
+      - gpu_action in ['plan', 'preflight', 'deploy', 'verify']
+      - inventory_hostname in groups.get('gpu_nodes', [])
+      - inventory_hostname not in groups.get('headnode', [])
+      - gpu_action == 'plan' or hostvars[groups['headnode'][0]].gpu_cluster is defined
+    fail_msg: Run core/playbooks/gpu.yml without bypassing its head stage.
+
+- name: Initialize or inspect the Jetson
+  when: gpu_action != 'plan'
+  block:
+    - name: Consume the head contract
+      ansible.builtin.set_fact:
+        gpu_cluster: "{{ hostvars[groups['headnode'][0]].gpu_cluster }}"
+
+    - name: Wait for Jetson SSH and Python
+      ansible.builtin.wait_for_connection:
+        timeout: "{{ gpu_connection_timeout }}"
+      become: false
+      check_mode: false
+
+    - name: Check Jetson prerequisites before any installation
+      ansible.builtin.include_role:
+        name: "{{ gpu_components_dir }}/jetson"
+        tasks_from: preflight
+        public: false
+
+    - name: Reconcile the Jetson baseline
+      ansible.builtin.include_role:
+        name: "{{ gpu_components_dir }}/jetson"
+        tasks_from: deploy
+        public: false
+      when: gpu_action == 'deploy'
+
+    - name: Complete Jetson service changes before acceptance
+      ansible.builtin.meta: flush_handlers
+      when: gpu_action == 'deploy'
+
+    - name: Verify the initialized Jetson
+      ansible.builtin.include_role:
+        name: "{{ gpu_components_dir }}/jetson"
+        tasks_from: verify
+        public: false
+      when: gpu_action in ['deploy', 'verify']
+
+    - name: Report successful Jetson checks
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: {{ 'initialization and local CUDA acceptance passed'
+          if gpu_action in ['deploy', 'verify'] else 'initialization prerequisites passed' }}.
+          Slurm GPU scheduling is not configured by this workflow.

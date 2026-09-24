@@ -1,0 +1,11 @@
+---
+# Set this to the normal login created when flashing JetPack. It must already
+# have SSH key access from the controller, GPU device access, and working sudo.
+# ansible_user: your_jetson_login
+ansible_connection: ssh
+ansible_python_interpreter: /usr/bin/python3
+
+# The entrypoint supports the original Orin Nano / Ubuntu 22.04 / JetPack 6
+# architecture. Address and architecture remain in config/hosts.yml.
+# Supply per-host sudo passwords through Ansible Vault when they differ from
+# the head password; do not put plaintext credentials here.

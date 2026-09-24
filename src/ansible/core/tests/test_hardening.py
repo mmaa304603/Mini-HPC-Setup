@@ -124,6 +124,64 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.call('activate', str(stage))
         self.assertEqual((self.live / 'provision/image').read_text(), 'old image')
 
+    def test_archive_retention_excludes_old_cpu_archives_before_copy(self):
+        images = self.live / 'provision/images'
+        images.mkdir()
+        old = 'rocky-release-' + 'a' * 32 + '.img.gz'
+        removed = ['rocky.img', 'rocky.img.gz', old]
+        kept = ['other.img.gz', 'rocky-release-manual.img.gz']
+        for name in removed + kept:
+            (images / name).write_text(name)
+        stage = Path(release.execute(str(self.base), 'begin', layout=self.layout,
+                     etc_source=str(self.etc), replace_image='rocky')['release'])
+        self.assertEqual(sorted(p.name for p in (stage / 'provision/images').iterdir()), sorted(kept))
+        # Staging never removes the currently served files.
+        for name in removed:
+            self.assertTrue((images / name).is_file())
+        (stage / 'provision/images/new.img.gz').write_text('new')
+        self.call('seal', str(stage))
+        self.call('activate', str(stage))
+        # First migration's rollback snapshot must retain the original archives.
+        self.call('rollback')
+        for name in removed:
+            self.assertTrue((self.live / 'provision/images' / name).is_file())
+
+    def test_chroot_alias_cleanup_preserves_active_and_unmanaged_entries(self):
+        stage = self.staged()
+        self.call('activate', str(stage))
+        chroots = self.root / 'chroots'
+        chroots.mkdir()
+        def alias(directory):
+            name = 'rocky-' + directory.name
+            target = directory / 'chroots' / name
+            target.mkdir(parents=True)
+            link = chroots / name
+            link.symlink_to(target)
+            return link
+        active = alias(stage)
+        previous = (self.base / 'previous').resolve()
+        old = alias(previous)
+        orphan = chroots / ('rocky-release-' + 'a' * 32)
+        orphan.symlink_to(self.base / ('release-' + 'a' * 32) / 'chroots' / orphan.name)
+        working = chroots / 'rocky'
+        working.mkdir()
+        unrelated = chroots / ('other-release-' + 'b' * 32)
+        unrelated.symlink_to(self.root / 'missing')
+        # Pending activation must prevent begin/cleanup; rollback links survive.
+        with self.assertRaises(ValueError):
+            release.execute(str(self.base), 'begin', layout=self.layout,
+                            etc_source=str(self.etc), chroot_dir=str(chroots))
+        self.assertTrue(old.exists())
+        release.execute(str(self.base), 'finish', str(stage), self.layout,
+                        str(self.etc), chroot_dir=str(chroots))
+        self.assertTrue(active.exists())
+        self.assertFalse(old.is_symlink())
+        self.assertFalse(orphan.is_symlink())
+        self.assertTrue(working.is_dir())
+        self.assertTrue(unrelated.is_symlink())
+        release.clean_chroot_links(self.base, str(chroots))
+        self.assertTrue(active.exists())
+
     def test_interrupted_migration_blocks_retry_and_can_restore_pointers(self):
         stage = self.staged()
         original = release.bind_layout
