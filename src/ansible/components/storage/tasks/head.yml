@@ -1,0 +1,90 @@
+---
+- ansible.builtin.import_tasks: preflight.yml
+- name: Install NFS server utilities
+  ansible.builtin.dnf:
+    name: [nfs-utils, acl, e2fsprogs, util-linux]
+    state: present
+- name: Create a preallocated filesystem file only when no backing file exists
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/context.py') }}"
+      - "{{ {'backend': storage_backend, 'size_gib': storage_size_gib, 'reserve': storage_root_reserve_bytes, 'minimum': storage_min_free_bytes, 'uuid': storage_filesystem_uuid, 'users': storage_users, 'projects': storage_projects} | to_json }}"
+      - --create
+  register: storage_create_result
+  changed_when: storage_create_result.rc == 0 and (storage_create_result.stdout | from_json).changed
+  when: storage_backend == 'loop'
+- name: Persist and mount the loop filesystem or record the existing disk mount
+  ansible.posix.mount:
+    path: /shared
+    src: "{{ '/var/lib/hpc-storage/shared.img' if storage_backend == 'loop' else 'UUID=' ~ storage_filesystem_uuid }}"
+    fstype: "{{ storage_context.fstype }}"
+    opts: "{{ storage_mount_options ~ (',loop,nodiscard,X-fstrim.notrim' if storage_backend == 'loop' else '') }}"
+    state: "{{ 'mounted' if storage_backend == 'loop' else 'present' }}"
+- name: Confirm the actual mounted filesystem before creating directories or exports
+  ansible.builtin.include_tasks: preflight.yml
+  vars:
+    storage_require_mounted: true
+- name: Protect shared top-level directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: [/shared, /shared/users, /shared/projects, /shared/scratch]
+- name: Create private persistent user and scratch directories
+  ansible.builtin.file:
+    path: "/shared/{{ item.0 }}/{{ item.1.name }}"
+    state: directory
+    owner: "{{ item.1.uid }}"
+    group: "{{ item.1.gid }}"
+    mode: '0700'
+  loop: "{{ ['users', 'scratch'] | product(storage_context.users) | list }}"
+- name: Create project directories with group inheritance
+  ansible.builtin.file:
+    path: "/shared/projects/{{ item.name }}"
+    state: directory
+    owner: root
+    group: "{{ item.gid }}"
+    mode: '2770'
+  loop: "{{ storage_context.projects }}"
+- name: Inherit project group write access for new files
+  ansible.posix.acl:
+    path: "/shared/projects/{{ item.name }}"
+    etype: group
+    entity: "{{ item.group }}"
+    permissions: rwx
+    default: true
+    state: present
+  loop: "{{ storage_context.projects }}"
+- name: Create managed configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: [/etc/exports.d, /etc/systemd/system/nfs-server.service.d]
+- name: Require the data filesystem before starting the NFS server
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nfs-server.service.d/hpc-storage.conf
+    mode: '0644'
+    content: |
+      [Unit]
+      RequiresMountsFor=/shared
+      [Service]
+      ExecStartPre=/usr/bin/mountpoint -q /shared
+  notify: Storage reload systemd
+- name: Export only the dedicated data filesystem on the private network
+  ansible.builtin.copy:
+    dest: /etc/exports.d/hpc-data.exports
+    mode: '0644'
+    content: "/shared {{ core_cluster.network.cidr }}(rw,sync,root_squash,no_subtree_check,mountpoint)\n"
+  notify: Storage reload exports
+- name: Enable the shared storage server
+  ansible.builtin.systemd:
+    name: nfs-server
+    daemon_reload: true
+    enabled: true
+    state: started
+- ansible.builtin.meta: flush_handlers

@@ -63,6 +63,7 @@ class OrchestrationTests(unittest.TestCase):
         model_task = next(task for task in self.preflight
                           if task["name"] == "Construct the validated cluster contract")
         setup = {
+            "admin_user": "jay",
             "schema_version": 1, "required_distribution": "Rocky",
             "required_rocky_major_version": "9", "network_interface": "cluster0",
             "network_address": "10.0.0.1", "network_prefix": 22,
@@ -154,6 +155,29 @@ class OrchestrationTests(unittest.TestCase):
         self.assertFalse((self.root / 'deploy-lock').exists(), result.stdout)
         self.assertNotIn("PHASE_RAN::warewulf/publish", result.stdout)
         self.assertNotIn("Selected components and CPU image publication finished.", result.stdout)
+
+    def test_storage_failure_prevents_software_installation_and_publication(self):
+        self.write(self.components / 'storage/tasks/head.yml', [
+            {'ansible.builtin.fail': {'msg': 'STORAGE_NOT_READY'}}])
+        result = self.run_play()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('STORAGE_NOT_READY', result.stdout)
+        self.assertNotIn('PHASE_RAN::spack/head', result.stdout)
+        self.assertNotIn('PHASE_RAN::warewulf/publish', result.stdout)
+        self.assertFalse((self.root / 'deploy-lock').exists())
+
+    def test_storage_preflight_failure_prevents_lock_and_all_installers(self):
+        tasks = yaml.safe_load((self.role / 'tasks/preflight.yml').read_text())
+        tasks.append(next(t for t in self.preflight
+                          if t['name'] == 'Validate shared storage before any installation or checkpoint resume'))
+        self.write(self.role / 'tasks/preflight.yml', tasks)
+        self.write(self.components / 'storage/tasks/preflight.yml', [
+            {'ansible.builtin.fail': {'msg': 'DEDICATED_DATA_DISK_REQUIRED'}}])
+        result = self.run_play('-e', 'core_resume=true', '-e', 'core_checkpoint_enabled=true')
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('DEDICATED_DATA_DISK_REQUIRED', result.stdout)
+        self.assertNotIn('PHASE_RAN::', result.stdout)
+        self.assertFalse((self.root / 'deploy-lock').exists())
 
     def test_preparation_runs_only_two_phases_and_flushes_handlers(self):
         # Neither publication nor unrelated component files are needed here.

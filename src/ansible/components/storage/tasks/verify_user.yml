@@ -1,0 +1,63 @@
+---
+- name: Allocate an isolated acceptance directory as the real user
+  ansible.builtin.tempfile:
+    state: directory
+    path: "/shared/users/{{ storage_user.name }}"
+    prefix: .hpc-storage-check-
+  become: true
+  become_user: "{{ storage_user.name }}"
+  register: storage_test_dir
+- name: Check shared reads and writes without root privileges
+  block:
+    - name: Write the head marker
+      ansible.builtin.copy:
+        dest: "{{ storage_test_dir.path }}/head"
+        content: "{{ storage_test_dir.path }}"
+        mode: '0600'
+      become: true
+      become_user: "{{ storage_user.name }}"
+    - name: Read the head marker and write a worker marker with matching identity
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -c
+          - |
+            import os, pathlib, sys
+            directory = pathlib.Path(sys.argv[1])
+            assert os.getuid() == int(sys.argv[3]) and os.getgid() == int(sys.argv[4]), 'Worker UID/GID mismatch'
+            assert (directory / 'head').read_text() == str(directory), 'Head data not visible'
+            with (directory / sys.argv[2]).open('x') as stream:
+                stream.write(sys.argv[2])
+          - "{{ storage_test_dir.path }}"
+          - "{{ item.name }}"
+          - "{{ storage_user.uid }}"
+          - "{{ storage_user.gid }}"
+      delegate_to: "{{ item.name }}"
+      loop: "{{ core_cluster.cpu_nodes }}"
+      become: true
+      become_user: "{{ storage_user.name }}"
+      changed_when: false
+    - name: Read every worker marker on the head and all workers
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - -c
+          - |
+            import json, pathlib, sys
+            directory = pathlib.Path(sys.argv[1])
+            for name in json.loads(sys.argv[2]):
+                assert (directory / name).read_text() == name, 'Worker data not shared'
+          - "{{ storage_test_dir.path }}"
+          - "{{ core_cluster.cpu_nodes | map(attribute='name') | list | to_json }}"
+      delegate_to: "{{ item }}"
+      loop: "{{ [inventory_hostname] + (core_cluster.cpu_nodes | map(attribute='name') | list) }}"
+      become: true
+      become_user: "{{ storage_user.name }}"
+      changed_when: false
+  always:
+    - name: Remove only this acceptance directory
+      ansible.builtin.file:
+        path: "{{ storage_test_dir.path }}"
+        state: absent
+      become: true
+      become_user: "{{ storage_user.name }}"

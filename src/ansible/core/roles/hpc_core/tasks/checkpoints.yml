@@ -4,7 +4,7 @@
     phases: "{{ core_selected_deploy }}"
     core_role: "{{ role_path }}"
     components_dir: "{{ core_components_dir }}"
-    cluster: "{{ core_cluster }}"
+    cluster: "{{ core_cluster | combine({'storage': storage_context | default({})} if 'storage' in core_components else {}) }}"
     setup: "{{ core_setup_contents.content | b64decode | from_yaml }}"
   register: core_checkpoint_fingerprints
   no_log: true

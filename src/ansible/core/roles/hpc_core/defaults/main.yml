@@ -2,7 +2,7 @@
 # Override deployment inputs in config/group_vars/all.yml.
 core_action: deploy                  # plan | preflight | deploy | verify
 core_stage: full                     # full | warewulf_prepare (head + image_prepare only)
-core_components: [warewulf, slurm, spack, lmod]
+core_components: [warewulf, slurm, storage, spack, lmod]
 core_components_dir: "{{ playbook_dir }}/../../components"
 core_setup_file: /etc/hpc-setup/setup.yml
 core_setup_complete_flag: /var/log/hpc-setup/checkpoints/setup_complete
@@ -22,6 +22,27 @@ core_lock_dir: /run/lock/hpc-core-deploy
 # Stable observations only: do not hash files deliberately changed by later phases.
 core_image_root: "/var/lib/warewulf/chroots/{{ core_cpu_image }}/rootfs"
 core_checkpoint_probes:
+  storage-head:
+    paths: >-
+      {{ ['/etc/exports.d/hpc-data.exports', '/etc/fstab',
+          '/etc/systemd/system/nfs-server.service.d/hpc-storage.conf',
+          '/shared', '/shared/users', '/shared/projects', '/shared/scratch']
+         + (storage_context.users | default([]) | map(attribute='name') | map('regex_replace', '^', '/shared/users/') | list)
+         + (storage_context.users | default([]) | map(attribute='name') | map('regex_replace', '^', '/shared/scratch/') | list)
+         + (storage_context.projects | default([]) | map(attribute='name') | map('regex_replace', '^', '/shared/projects/') | list) }}
+    commands:
+      - [findmnt, -n, --mountpoint, /shared, -o, 'SOURCE,FSTYPE,UUID,OPTIONS']
+      - [systemctl, is-active, nfs-server]
+      - [exportfs, -v]
+  storage-cpu_image:
+    paths: >-
+      {{ [core_image_root ~ '/etc/systemd/system/shared.mount',
+          core_image_root ~ '/etc/passwd', core_image_root ~ '/etc/group',
+          core_image_root ~ '/shared']
+         + ([core_image_root ~ '/etc/systemd/system/slurmd.service.d/hpc-storage.conf']
+            if 'slurm' in core_components else []) }}
+    commands:
+      - [systemctl, --root, "{{ core_image_root }}", is-enabled, shared.mount]
   warewulf-head:
     paths: [/etc/warewulf/warewulf.conf, /etc/systemd/system/dhcpd.service.d/hpc-interface.conf]
     commands:

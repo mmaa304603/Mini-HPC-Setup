@@ -214,7 +214,7 @@ class ResumeTests(unittest.TestCase):
         self.enable_checkpoints()
         # Use real defaults with recording roles, never real installers. A normal
         # exit must run block/always so the deployment lock is released.
-        for component in ('warewulf', 'slurm', 'spack'):
+        for component in ('warewulf', 'slurm', 'storage', 'spack'):
             shutil.copytree(orchestration.ANSIBLE / 'components' / component / 'defaults',
                             self.components / component / 'defaults')
         self.write(self.role / 'tasks/phase.yml', [
@@ -232,7 +232,7 @@ class ResumeTests(unittest.TestCase):
         self.assertEqual(second.returncode, 0, second.stdout)
         before = re.findall(r'"fingerprint": "([a-f0-9]+)"', first.stdout)
         after = re.findall(r'"fingerprint": "([a-f0-9]+)"', second.stdout)
-        self.assertEqual(len(before), 9)
+        self.assertEqual(len(before), len(self.catalog['core_deploy_phases']))
         self.assertTrue(all(a != b for a, b in zip(before, after)))
         self.assertNotIn('PHASE_RAN::', first.stdout + second.stdout)
 

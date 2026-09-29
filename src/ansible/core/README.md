@@ -5,16 +5,17 @@ Core prepares a Rocky Linux 9 x86_64 head and a Warewulf CPU image in this order
 1. Check the completed setup handoff and deployment inputs.
 2. Configure Warewulf head services and prepare the base CPU image.
 3. Configure Slurm/Munge on the head and inside the image.
-4. Configure Spack and Lmod on the head and provide image access.
-5. Publish the completed image and overlays.
-6. After CPU nodes boot, run cluster acceptance checks separately.
+4. Export the dedicated `/shared` data filesystem and configure worker mounts.
+5. Configure Spack and Lmod on the head and provide image access.
+6. Publish the completed image and overlays.
+7. After CPU nodes boot, run cluster acceptance checks separately.
 
 ## Current implementation status
 
 Provisioning uses inventory MACs on an isolated, trusted private network.
 
-**Warewulf, Slurm, Spack and Lmod implement the core entry points.**
-The default selection runs all four components. Spack builds software and
+**Warewulf, Slurm, storage, Spack and Lmod implement the core entry points.**
+The default selection runs all five components. Spack builds software and
 generates module files; Lmod installs their runtime and Bash initialization.
 The existing setup directory remains unchanged.
 Component tasks have local syntax/template/guard tests; physical PXE boot,
@@ -66,6 +67,14 @@ test-job user; slurm_verify_user may select another existing normal head user.
 
 ## Commands
 
+**The default deployment reserves 5 GiB of existing root-disk space in
+`/var/lib/hpc-storage/shared.img` and mounts its ext4 filesystem at `/shared`.**
+No extra disk or manually supplied UUID is needed. Initial preflight requires
+the allocation plus 6 GiB remaining free by default. Only a new private file is
+formatted; existing files and block devices are never reformatted. See
+[shared storage setup](../components/storage/README.md) for users,
+project groups, mount behavior, limitations and future Globus integration.
+
 Run from `src/ansible` so the root Ansible configuration is selected:
 
 ```bash
@@ -77,7 +86,7 @@ ansible-playbook core/playbooks/site.yml -e core_action=plan
 # Read-only setup, topology, capacity, identity and provisioning-input checks.
 ansible-playbook core/playbooks/site.yml -e core_action=preflight -K
 
-# Reconcile all four components and publish the CPU image.
+# Reconcile all five components and publish the CPU image.
 ansible-playbook core/playbooks/site.yml -K
 
 # After booting CPU nodes with the published image:
@@ -175,7 +184,7 @@ ansible-playbook core/playbooks/verify.yml -K \
   -e '{"core_components":["warewulf","slurm","spack"]}'
 ~~~
 
-Warewulf is required. Other supported selections are Slurm, Spack and Lmod;
+Warewulf is required. Other supported selections are Slurm, storage, Spack and Lmod;
 Lmod requires Spack. Selection does not uninstall previously installed components.
 With the default `core_stage=full`, all required phases for selected components
 run in the declared order. GPU scheduling, ELK, Grafana, Apptainer, eRaider and
@@ -220,11 +229,13 @@ task files through `tasks/phase.yml`:
 | 2 | `warewulf/tasks/image_prepare.yml` | Root SSH access and base CPU image preparation |
 | 3 | `slurm/tasks/head.yml` | Controller, Munge and time configuration |
 | 4 | `slurm/tasks/cpu_image.yml` | Worker configuration, matching Munge key and boot services |
-| 5 | `spack/tasks/head.yml` | Spack environment, requested packages and modules |
-| 6 | `spack/tasks/cpu_image.yml` | Read-only software mount and Spack shell integration |
-| 7 | `lmod/tasks/head.yml` | Head module runtime and shell integration |
-| 8 | `lmod/tasks/cpu_image.yml` | CPU module runtime and shell integration |
-| 9 | `warewulf/tasks/publish.yml` | Build and activate the complete image and overlays |
+| 5 | `storage/tasks/head.yml` | Dedicated data export and user/project directories |
+| 6 | `storage/tasks/cpu_image.yml` | Matching identities, shared mount and Slurm dependency |
+| 7 | `spack/tasks/head.yml` | Spack environment, requested packages and modules |
+| 8 | `spack/tasks/cpu_image.yml` | Read-only software mount and Spack shell integration |
+| 9 | `lmod/tasks/head.yml` | Head module runtime and shell integration |
+| 10 | `lmod/tasks/cpu_image.yml` | CPU module runtime and shell integration |
+| 11 | `warewulf/tasks/publish.yml` | Build and activate the complete image and overlays |
 
 Only selected components run. After each phase, handlers finish before its
 checkpoint is saved. Full deployment then verifies the served release and
@@ -380,7 +391,7 @@ Slurm configuration parse errors, and disabled/inactive Munge or Slurmd services
 A receipt from that older run does not prove those services were configured.
 
 The templates now insert explicit newlines before those terminators. Spack/Lmod
-profiles are syntax-checked, and the four main image-configuration tasks require
+profiles are syntax-checked, and the main image-configuration tasks require
 a final `HPC_CHANGED=0` or `HPC_CHANGED=1` output line as well as a zero exit code.
 To repair an affected image, run the full selected deployment, including
 publication, rather than editing only the running node:

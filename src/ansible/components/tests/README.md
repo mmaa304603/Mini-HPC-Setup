@@ -1,6 +1,6 @@
 # Component tests
 
-Local regression checks for the Warewulf, Slurm, Spack and Lmod roles.
+Local regression checks for the Warewulf, Slurm, storage, Spack and Lmod roles.
 The runner syntax-checks their real entry points through static role imports,
 then runs Python unittest discovery. Core's dynamic includes alone do not
 syntax-check every component task.
@@ -9,7 +9,9 @@ syntax-check every component task.
 
 Use the project's Ansible environment with Python 3, ansible-core, PyYAML and
 Jinja2 available. The tests also use Bash, OpenSSH (`ssh` and `ssh-keygen`),
-standard Linux utilities and POSIX pseudo-terminals. Install the pinned
+standard Linux utilities and POSIX pseudo-terminals. Storage tests also require
+`mkfs.ext4` and `blkid` on PATH; they format a disposable 32 MiB file in a temporary
+directory, never mount it or format a device. Install the pinned
 collections from `src/ansible/requirements.yml` if they are not already present.
 
 From `src/ansible`:
@@ -44,10 +46,14 @@ This focused command does not include the runner's static role syntax check.
 | --- | --- |
 | `test_components.py` | Rendered configuration, root/controller public keys, image execution guard, identity collisions, repeatable file updates, publication fingerprints and entry points. |
 | `test_slurm.py` | Unsynchronized clocks, wrong selected NTP source and Munge decoding failures stop acceptance; credential output remains hidden. These use command stubs. |
+| `test_storage.py` | Refusal of root/wrong/read-only/undersized data filesystems, existing identity and project membership validation, required worker mounts and private NFS firewall access without Spack. |
 | `test_software.py` | Missing/existing fstab handling, corrupt lockfiles, noninteractive Spack installation under a pseudo-terminal, lazy Spack initialization, Lmod paths and rejection of the wrong executable. |
 | `test_hardening.py` | Ownership migration with symlinks and internal/external hardlinks, pinned inputs, and optional real Warewulf overlay rendering. Ownership changes are mocked. |
 | `test_root_ssh.py` | Real temporary SSH key generation, preservation of existing keys, public-key repair, effective SSH configuration, invalid-key refusal and node-task syntax. Role paths and ownership settings are adapted for temporary unprivileged execution. |
 | `test_image_rendering.py` | Real Ansible template lookup preserves standalone heredoc boundaries; generated files exclude script remainder; profiles parse; image-task completion-marker checks reject incomplete runs. |
+
+Storage tests also cover preallocation, UUID preservation on rerun, refusal to
+resize/reformat existing files, cleanup of failed creation, and loop-device matching.
 
 The image-rendering regression checks shell-parser warnings as well as exit
 status: an unterminated heredoc can otherwise pass `bash -n` with a warning.

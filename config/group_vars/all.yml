@@ -1,5 +1,15 @@
 ---
-core_components: [warewulf, slurm, spack, lmod]
+core_components: [warewulf, slurm, storage, spack, lmod]
+# Reserve existing root-disk space in /var/lib/hpc-storage/shared.img.
+# No extra disk or manually supplied UUID is required.
+storage_backend: loop
+storage_size_gib: 5
+# For a separately mounted data disk instead:
+# storage_backend: existing
+# storage_filesystem_uuid: '<UUID from findmnt -no UUID --mountpoint /shared>'
+# storage_users defaults to the setup administrator; all must exist on the head.
+# storage_users: [jay]
+# storage_projects: [{name: research, group: research, members: [jay]}]
 core_cpu_image: rockylinux-9.5
 # Temporary firmware/iPXE leases; final CPU addresses are in hosts.yml.
 core_dhcp_start: 10.0.1.1

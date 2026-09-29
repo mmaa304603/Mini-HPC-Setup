@@ -50,6 +50,7 @@ def fixture():
         "slurm_worker_port": 6818, "slurm_srun_ports": "60001-63000",
         "slurm_rpm_release": "23.11.10-1.el9",
         "slurm_job_identity": {"name": "testuser", "uid": 1000, "gid": 1000, "group": "testuser"},
+        "storage_context": {"users": [{"name": "testuser", "uid": 1000, "gid": 1000, "group": "testuser"}], "projects": []},
         "slurm_key_data": {"content": base64.b64encode(b"test-only-key").decode()},
         "spack_install_dir": "/opt/spack", "spack_environment_dir": "/opt/spack/environments/hpc",
         "spack_view_dir": "/opt/spack/views/hpc", "spack_build_jobs": 4,
@@ -226,6 +227,7 @@ class EntryPointTests(unittest.TestCase):
     def test_all_requested_entry_points_exist(self):
         for role, phases in {"warewulf": ["head", "image_prepare", "publish", "verify"],
                              "slurm": ["head", "cpu_image", "verify"],
+                             "storage": ["preflight", "head", "cpu_image", "verify"],
                              "spack": ["head", "cpu_image", "verify"],
                              "lmod": ["head", "cpu_image", "verify"]}.items():
             for phase in phases:
@@ -235,7 +237,7 @@ class EntryPointTests(unittest.TestCase):
 
     def test_image_exec_never_auto_builds_or_syncs_identities(self):
         count = 0
-        for role in ["warewulf", "slurm", "spack", "lmod"]:
+        for role in ["warewulf", "slurm", "storage", "spack", "lmod"]:
             for path in (COMPONENTS / role / "tasks").glob("*.yml"):
                 text = path.read_text()
                 for line in text.splitlines():
@@ -244,7 +246,7 @@ class EntryPointTests(unittest.TestCase):
                         self.assertIn("--build=false", line)
                         self.assertIn("--syncuser=false", line)
                         self.assertIn("HPC_HEAD_ROOT=", line)
-        self.assertEqual(count, 6)
+        self.assertEqual(count, 7)
 
 
 if __name__ == "__main__":

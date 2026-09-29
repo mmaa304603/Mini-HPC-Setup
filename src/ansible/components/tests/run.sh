@@ -20,6 +20,7 @@ tasks = []
 for role, phases in {
     "warewulf": ["security", "head", "image_prepare", "publish", "verify", "rollback"],
     "slurm": ["head", "cpu_image", "verify"],
+    "storage": ["preflight", "head", "cpu_image", "verify"],
     "spack": ["head", "cpu_image", "verify"],
     "lmod": ["head", "cpu_image", "verify"],
     "jetson": ["preflight", "deploy", "verify"],

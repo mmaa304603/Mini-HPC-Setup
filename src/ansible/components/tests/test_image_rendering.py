@@ -15,7 +15,7 @@ class ImageRenderingTests(unittest.TestCase):
     def test_real_ansible_preserves_file_boundaries(self):
         with tempfile.TemporaryDirectory(prefix='hpc-image-render-') as directory:
             root = Path(directory)
-            components = ['warewulf', 'slurm', 'spack', 'lmod']
+            components = ['warewulf', 'slurm', 'storage', 'spack', 'lmod']
             tasks = []
             for component in components:
                 name = 'image-base.sh.j2' if component == 'warewulf' else 'cpu-image.sh.j2'

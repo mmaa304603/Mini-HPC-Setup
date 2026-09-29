@@ -6,7 +6,9 @@ worker services on the head.
 
 Run these entry points through [core](../../core/README.md); standalone role
 execution is rejected. The default full sequence prepares Warewulf, configures
-Slurm, then Spack and Lmod, and finally publishes the complete CPU image.
+Slurm, then storage, Spack and Lmod, and finally publishes the complete CPU image.
+With storage selected, its image phase makes slurmd require `/shared` at startup.
+See [shared storage](../storage/README.md) for the disk prerequisite and runtime limits.
 
 ## Deploy Warewulf and Slurm
 

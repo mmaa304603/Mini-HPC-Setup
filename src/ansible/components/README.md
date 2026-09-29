@@ -1,14 +1,15 @@
 # Ansible components
 
-Warewulf, Slurm, Spack and Lmod implement the staged [core workflow](../core/README.md).
+Warewulf, Slurm, storage, Spack and Lmod implement the staged [core workflow](../core/README.md).
 Each directory is one Ansible role. Core selects named task entry points;
-the four supported roles' `tasks/main.yml` deliberately fail with directions
+the five supported roles' `tasks/main.yml` deliberately fail with directions
 to use core instead. They are not standalone installation entry points.
 
 | Component | Implemented entry points |
 | --- | --- |
 | [Warewulf](warewulf/README.md) | security, head, image_prepare, publish, verify_publication, verify, rollback |
 | [Slurm](slurm/README.md) | head, cpu_image, verify |
+| [Storage](storage/README.md) | preflight, head, cpu_image, verify |
 | [Spack](spack/README.md) | head, cpu_image, verify |
 | [Lmod](lmod/README.md) | head, cpu_image, verify |
 | [Jetson](jetson/README.md) | preflight, deploy, verify (separate GPU entrypoint) |
@@ -28,12 +29,15 @@ The default full deployment runs these phases on the head:
 2. **Slurm `head` → `cpu_image`:** configure the controller and workers, copy
    the Munge key through protected stdin, configure time synchronization, and
    enable the worker services for boot.
-3. **Spack `head` → `cpu_image`:** prepare the software environment on the head,
+3. **Storage `head` → `cpu_image`:** create/reuse a preallocated 5 GiB filesystem
+   file on `/`, mount and export it at `/shared`, create user/project directories, configure matching worker
+   identities and require the shared mount before slurmd starts.
+4. **Spack `head` → `cpu_image`:** prepare the software environment on the head,
    install requested packages, generate Lmod modules when selected, and configure
    the CPU's read-only NFS software mount and on-demand Spack shell function.
-4. **Lmod `head` → `cpu_image`:** install the module runtime and Bash integration
+5. **Lmod `head` → `cpu_image`:** install the module runtime and Bash integration
    for the shared Spack modules.
-5. **Warewulf `publish`:** snapshot and build the completed image, configure CPU
+6. **Warewulf `publish`:** snapshot and build the completed image, configure CPU
    nodes and overlays, validate the release, and activate it. Core then runs
    `verify_publication`, including when a valid resume skips publication.
 
@@ -63,7 +67,13 @@ Configure the repository's [shared deployment files](../../../config/README.md):
   `warewulf_authorized_keys` containing the controller user's public SSH keys.
   Review `warewulf_compute_dns` for your network.
 
-The current selection is Warewulf, Slurm, Spack and Lmod, with CPU image
+The default storage selection uses `storage_backend: loop` and `storage_size_gib: 5`.
+It reserves existing root-disk space in `/var/lib/hpc-storage/shared.img` and mounts
+it at `/shared`, without a manually supplied UUID. Initial preflight requires
+at least 11 GiB free by default. Existing files and block devices are never formatted.
+See [storage setup](storage/README.md).
+
+The current selection is Warewulf, Slurm, storage, Spack and Lmod, with CPU image
 `rockylinux-9.5` and Spack package `hdf5`. DHCP leases use `10.0.1.1–10.0.1.255`;
 the node network overlay applies final CPU addresses `10.0.2.1–10.0.2.3` after
 boot. Both are inside the configured cluster `/22`.

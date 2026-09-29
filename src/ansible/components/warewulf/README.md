@@ -16,9 +16,12 @@ ansible-playbook core/playbooks/site.yml -K
 ansible-playbook core/playbooks/verify.yml -K
 ```
 
-The configured full deployment prepares Warewulf, runs Slurm, Spack and Lmod,
+The configured full deployment prepares Warewulf, runs Slurm, storage, Spack and Lmod,
 then publishes once. For preparation without publication, see
 [the first two Warewulf phases](../../core/README.md#first-two-warewulf-phases).
+
+Full deployment includes [shared data storage](../storage/README.md): by default
+it reserves 5 GiB from the existing root disk, with capacity checked before installation.
 
 ## Inputs
 

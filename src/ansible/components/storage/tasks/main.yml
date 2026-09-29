@@ -1,0 +1,3 @@
+---
+- ansible.builtin.fail:
+    msg: Use core/playbooks/site.yml to run storage entry points.

@@ -32,6 +32,13 @@
   ansible.builtin.setup:
     gather_subset: ['!all', min]
 
+- name: Validate shared storage before any installation or checkpoint resume
+  ansible.builtin.include_role:
+    name: "{{ core_components_dir }}/storage"
+    tasks_from: preflight
+    public: false
+  when: "'storage' in core_components"
+
 - name: Require the supported head operating system
   ansible.builtin.assert:
     that:

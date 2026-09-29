@@ -1,0 +1,17 @@
+---
+- ansible.builtin.import_tasks: preflight.yml
+  vars:
+    storage_require_mounted: true
+- name: Validate image execution context
+  ansible.builtin.include_role:
+    name: "{{ role_path }}/../warewulf"
+    tasks_from: image_context
+- name: Configure shared storage inside the image without mounting it
+  ansible.builtin.command:
+    argv: [wwctl, image, exec, '--build=false', '--syncuser=false', "{{ core_cluster.cpu_image }}", --, /usr/bin/env, "HPC_HEAD_ROOT={{ hpc_head_root_identity }}", /bin/bash, -s]
+    stdin: |
+      {{ lookup('ansible.builtin.file', role_path ~ '/../warewulf/files/image-functions.sh') }}
+      {{ lookup('ansible.builtin.template', 'cpu-image.sh.j2') }}
+  register: storage_image_result
+  changed_when: "'HPC_CHANGED=1' in storage_image_result.stdout"
+  failed_when: storage_image_result.rc != 0 or storage_image_result.stdout is not search('(?m)^HPC_CHANGED=[01]$')

@@ -1,0 +1,28 @@
+---
+- ansible.builtin.import_tasks: preflight.yml
+- name: Require the running data server
+  ansible.builtin.command:
+    argv: [systemctl, is-active, nfs-server]
+  changed_when: false
+- name: Inspect the actual shared filesystem on every worker
+  ansible.builtin.command:
+    argv: [findmnt, --json, --mountpoint, /shared, --output, 'SOURCE,FSTYPE,OPTIONS']
+  delegate_to: "{{ item.name }}"
+  loop: "{{ core_cluster.cpu_nodes }}"
+  register: storage_worker_mounts
+  changed_when: false
+- name: Require the expected read-write NFS source rather than a local directory
+  ansible.builtin.assert:
+    that:
+      - mount.source == core_cluster.head.address ~ ':/shared'
+      - mount.fstype in ['nfs', 'nfs4']
+      - "'rw' in mount.options.split(',')"
+      - "'hard' in mount.options.split(',')"
+  vars:
+    mount: "{{ (item.stdout | from_json).filesystems[0] }}"
+  loop: "{{ storage_worker_mounts.results }}"
+- name: Verify cross-node data access as each configured user
+  ansible.builtin.include_tasks: verify_user.yml
+  loop: "{{ storage_context.users }}"
+  loop_control:
+    loop_var: storage_user

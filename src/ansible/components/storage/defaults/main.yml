@@ -1,0 +1,15 @@
+---
+# loop: create a bounded filesystem file on /; existing: use a mounted data disk.
+storage_backend: loop
+storage_size_gib: 5
+# Leave room for the head and Warewulf staging after reserving the file.
+storage_root_reserve_bytes: "{{ core_min_free_bytes | default(6442450944) }}"
+# Required only for the existing backend. Loop UUIDs are detected automatically.
+storage_filesystem_uuid: ''
+storage_mount_options: defaults,nofail,x-systemd.device-timeout=30
+storage_min_free_bytes: 1073741824
+# Accounts must already exist on the head; numeric IDs are never changed.
+storage_users: "{{ [(core_setup_contents.content | b64decode | from_yaml).admin_user] }}"
+# Optional existing head groups; all members must be listed in storage_users.
+# Example: [{name: research, group: research, members: [jay]}]
+storage_projects: []

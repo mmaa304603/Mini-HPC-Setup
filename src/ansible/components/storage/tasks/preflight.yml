@@ -1,0 +1,14 @@
+---
+- name: Validate shared storage capacity, backing filesystem and head identities
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/context.py') }}"
+      - "{{ {'backend': storage_backend, 'size_gib': storage_size_gib, 'reserve': storage_root_reserve_bytes, 'uuid': storage_filesystem_uuid, 'minimum': storage_min_free_bytes, 'users': storage_users, 'projects': storage_projects, 'require_mounted': storage_require_mounted | default(core_action == 'verify')} | to_json }}"
+  register: storage_context_result
+  changed_when: false
+  check_mode: false
+- name: Retain validated nonsecret storage identities for this run
+  ansible.builtin.set_fact:
+    storage_context: "{{ storage_context_result.stdout | from_json }}"

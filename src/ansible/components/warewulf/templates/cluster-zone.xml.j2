@@ -7,7 +7,7 @@
   <service name="tftp"/>
   <service name="ntp"/>
   <port protocol="tcp" port="9873"/>
-{% if 'spack' in core_components %}
+{% if 'spack' in core_components or 'storage' in core_components %}
   <service name="nfs"/>
 {% endif %}
 {% if 'slurm' in core_components %}

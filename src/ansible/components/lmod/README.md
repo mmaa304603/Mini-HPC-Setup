@@ -31,8 +31,9 @@ configuration. The default test uses the first `spack_packages` spec and
 
 ## Use
 
-From `src/ansible`, after setup and configuration, deploy the default four
-components together:
+From `src/ansible`, after setup and configuration, deploy the default
+software and shared storage components together (prepare `/shared` as described
+in the [storage README](../storage/README.md) first):
 
 ```bash
 ansible-playbook core/playbooks/site.yml -K -e core_action=preflight

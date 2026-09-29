@@ -1,0 +1,8 @@
+---
+- name: Storage reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+- name: Storage reload exports
+  ansible.builtin.command:
+    argv: [exportfs, -ra]
+  changed_when: true

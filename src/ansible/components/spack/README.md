@@ -55,6 +55,9 @@ particular CPU microarchitecture.
 From `src/ansible`, after setup and configuration, the default full deployment
 runs Spack after Slurm and before Lmod:
 
+The default selection also configures storage before Spack; review its
+[`/shared` capacity requirements](../storage/README.md) before deployment.
+
 ```bash
 ansible-playbook core/playbooks/site.yml -K -e core_action=preflight
 ansible-playbook core/playbooks/site.yml -K

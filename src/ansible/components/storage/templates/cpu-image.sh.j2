@@ -1,0 +1,57 @@
+{% for account in storage_context.users %}
+check_identity {{ account.name | quote }} {{ account.uid }} {{ account.group | quote }} {{ account.gid }}
+{% endfor %}
+{% for project in storage_context.projects %}
+found="$(getent group {{ project.group | quote }} || true)"
+[[ -z "$found" || "$(printf '%s' "$found" | cut -d: -f3)" == {{ project.gid | quote }} ]] || exit 1
+found="$(getent group {{ project.gid | quote }} || true)"
+[[ -z "$found" || "${found%%:*}" == {{ project.group | quote }} ]] || exit 1
+{% endfor %}
+install_packages nfs-utils acl
+{% for account in storage_context.users %}
+ensure_identity {{ account.name | quote }} {{ account.uid }} {{ account.group | quote }} {{ account.gid }} /home/{{ account.name }} /bin/bash
+ensure_dir /home/{{ account.name }} 0700 {{ account.name | quote }} {{ account.group | quote }}
+{% endfor %}
+{% for project in storage_context.projects %}
+if ! getent group {{ project.group | quote }} >/dev/null; then
+    groupadd --gid {{ project.gid }} {{ project.group | quote }}; hpc_changed=1
+fi
+{% for member in project.members %}
+if [[ " $(id -G {{ member | quote }}) " != *" {{ project.gid }} "* ]]; then
+    usermod -a -G {{ project.group | quote }} {{ member | quote }}; hpc_changed=1
+fi
+{% endfor %}
+{% endfor %}
+# An absent mount must not become writable stateless job storage.
+if [[ -L /shared ]] || mountpoint -q /shared; then
+    echo 'Refusing to modify a redirected or mounted image /shared' >&2
+    exit 1
+fi
+ensure_dir /shared 0555 root root
+put_file /etc/systemd/system/shared.mount 0644 root root <<'HPC_SHARED_MOUNT'
+[Unit]
+Description=Persistent HPC shared data
+Wants=network-online.target
+After=network-online.target
+Before=slurmd.service
+[Mount]
+What={{ core_cluster.head.address }}:/shared
+Where=/shared
+Type=nfs4
+Options=rw,hard,_netdev,nosuid,nodev
+TimeoutSec=30
+[Install]
+WantedBy=multi-user.target
+HPC_SHARED_MOUNT
+{% if 'slurm' in core_components %}
+put_file /etc/systemd/system/slurmd.service.d/hpc-storage.conf 0644 root root <<'HPC_STORAGE_DEPENDENCY'
+[Unit]
+RequiresMountsFor=/shared
+BindsTo=shared.mount
+After=shared.mount
+[Service]
+ExecStartPre=/usr/bin/mountpoint -q /shared
+HPC_STORAGE_DEPENDENCY
+{% endif %}
+enable_service shared.mount
+echo "HPC_CHANGED=$hpc_changed"
