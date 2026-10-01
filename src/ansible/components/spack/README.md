@@ -119,3 +119,10 @@ to already booted workers. Warewulf release rollback does not roll them back.
 See [local tests](../tests/README.md),
 [Spack 0.23.1 environments](https://spack.readthedocs.io/en/v0.23.1/environments.html)
 and [module configuration](https://spack.readthedocs.io/en/v0.23.1/module_file_support.html).
+
+## Optional ELK observability
+
+When `elk` is selected, core also enables this component's managed telemetry.
+See [ELK collection and verification](../elk/OBSERVABILITY.md) for sources,
+retention, test commands and coverage limits. Normal component operations do not
+wait for Elasticsearch.

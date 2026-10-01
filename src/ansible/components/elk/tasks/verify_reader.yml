@@ -1,0 +1,33 @@
+---
+- name: Require unauthenticated reader queries to be rejected
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9201/query
+    method: POST
+    body_format: json
+    body: {limit: 1}
+    status_code: 401
+    use_proxy: false
+- name: Read the local query credential for verification
+  ansible.builtin.slurp:
+    src: /etc/hpc-log-reader.env
+  register: elk_reader_credentials
+  no_log: true
+- name: Require the restricted authenticated query to find the probe
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9201/query
+    method: POST
+    headers:
+      Authorization: "Bearer {{ (elk_reader_credentials.content | b64decode | trim).split('=', 1)[1] }}"
+    body_format: json
+    body: {dataset: hpc.probe, message: '{{ elk_probe }}', limit: 1}
+    use_proxy: false
+  register: elk_reader_probe
+  until: elk_reader_probe.status == 200 and elk_reader_probe.json.records | default([]) | length > 0
+  retries: 12
+  delay: 5
+  no_log: true
+- name: Discard the reader credential fact
+  ansible.builtin.set_fact:
+    elk_reader_credentials: {}
+    elk_reader_probe: {}
+  no_log: true

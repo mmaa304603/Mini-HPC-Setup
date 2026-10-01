@@ -23,6 +23,7 @@ for role, phases in {
     "storage": ["preflight", "head", "cpu_image", "verify"],
     "spack": ["head", "cpu_image", "verify"],
     "lmod": ["head", "cpu_image", "verify"],
+    "elk": ["preflight", "head", "cpu_image", "verify"],
     "jetson": ["preflight", "deploy", "verify"],
 }.items():
     for phase in phases:

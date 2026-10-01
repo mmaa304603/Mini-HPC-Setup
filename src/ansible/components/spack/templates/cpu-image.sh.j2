@@ -17,4 +17,9 @@ put_file /etc/profile.d/hpc-spack.sh 0644 root root <<'HPC_PROFILE'
 {% include 'spack.sh.j2' %}{{ '\n' }}
 HPC_PROFILE
 /bin/bash -n /etc/profile.d/hpc-spack.sh
+{% if 'elk' in core_components %}
+put_file /usr/local/bin/hpc-spack 0755 root root <<'HPC_SPACK_WRAPPER'
+{% include 'hpc-spack.sh.j2' %}{{ '\n' }}
+HPC_SPACK_WRAPPER
+{% endif %}
 echo "HPC_CHANGED=$hpc_changed"

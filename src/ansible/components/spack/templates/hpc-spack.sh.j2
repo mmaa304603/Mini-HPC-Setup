@@ -1,0 +1,3 @@
+#!/bin/bash
+# Optional audited entry point. Uses the invoking user's existing permissions.
+exec /usr/local/libexec/hpc-telemetry --output journal run --action user-spack --spec "$*" -- {{ (spack_install_dir ~ '/bin/spack') | quote }} "$@"

@@ -2,7 +2,7 @@
 # Override deployment inputs in config/group_vars/all.yml.
 core_action: deploy                  # plan | preflight | deploy | verify
 core_stage: full                     # full | warewulf_prepare (head + image_prepare only)
-core_components: [warewulf, slurm, storage, spack, lmod]
+core_components: [warewulf, slurm, storage, spack, lmod, elk]
 core_components_dir: "{{ playbook_dir }}/../../components"
 core_setup_file: /etc/hpc-setup/setup.yml
 core_setup_complete_flag: /var/log/hpc-setup/checkpoints/setup_complete
@@ -22,6 +22,43 @@ core_lock_dir: /run/lock/hpc-core-deploy
 # Stable observations only: do not hash files deliberately changed by later phases.
 core_image_root: "/var/lib/warewulf/chroots/{{ core_cpu_image }}/rootfs"
 core_checkpoint_probes:
+  elk-head:
+    paths:
+      - /var/lib/hpc-setup/elk-managed
+      - /usr/local/libexec/hpc-telemetry
+      - /usr/local/libexec/hpc-log-reader
+      - /etc/systemd/system/hpc-log-reader.service
+      - /etc/hpc-telemetry.json
+      - /etc/systemd/system/hpc-telemetry.service
+      - /etc/systemd/system/hpc-telemetry.timer
+      - /etc/elasticsearch/elasticsearch.yml
+      - /etc/elasticsearch/jvm.options.d/hpc.options
+      - /etc/logstash/logstash.yml
+      - /etc/logstash/pipelines.yml
+      - /etc/logstash/conf.d/hpc.conf
+      - /etc/kibana/kibana.yml
+      - /etc/filebeat/filebeat.yml
+      - /etc/systemd/system/logstash.service.d/hpc.conf
+      - /etc/systemd/system/kibana.service.d/hpc.conf
+      - "/etc/firewalld/zones/{{ warewulf_cluster_zone | default('hpc-cluster') }}.xml"
+    commands:
+      - [systemctl, is-active, hpc-telemetry.timer, hpc-log-reader]
+      - [rpm, -q, elasticsearch, logstash, kibana, filebeat]
+      - [systemctl, is-active, elasticsearch, logstash, kibana, filebeat]
+      - [curl, --noproxy, '*', --fail, --silent, --show-error, --max-time, '10', --output, /dev/null, 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s']
+      - [curl, --noproxy, '*', --fail, --silent, --show-error, --max-time, '10', --output, /dev/null, 'http://127.0.0.1:9600/_node/pipelines/main']
+      - [curl, --noproxy, '*', --fail, --silent, --show-error, --max-time, '10', --output, /dev/null, 'http://127.0.0.1:5601/api/status']
+  elk-cpu_image:
+    paths:
+      - "{{ core_image_root }}/usr/local/libexec/hpc-telemetry"
+      - "{{ core_image_root }}/etc/hpc-telemetry.json"
+      - "{{ core_image_root }}/etc/systemd/system/hpc-telemetry.timer"
+      - "{{ core_image_root }}/etc/systemd/system/hpc-telemetry.service"
+      - "{{ core_image_root }}/etc/filebeat/filebeat.yml"
+      - "{{ core_image_root }}/etc/yum.repos.d/hpc-elastic.repo"
+    commands:
+      - [rpm, --root, "{{ core_image_root }}", -q, filebeat]
+      - [systemctl, --root, "{{ core_image_root }}", is-enabled, filebeat]
   storage-head:
     paths: >-
       {{ ['/etc/exports.d/hpc-data.exports', '/etc/fstab',

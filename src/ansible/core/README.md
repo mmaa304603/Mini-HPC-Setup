@@ -7,15 +7,16 @@ Core prepares a Rocky Linux 9 x86_64 head and a Warewulf CPU image in this order
 3. Configure Slurm/Munge on the head and inside the image.
 4. Export the dedicated `/shared` data filesystem and configure worker mounts.
 5. Configure Spack and Lmod on the head and provide image access.
-6. Publish the completed image and overlays.
-7. After CPU nodes boot, run cluster acceptance checks separately.
+6. Start ELK on the head and configure CPU log collection.
+7. Publish the completed image and overlays.
+8. After CPU nodes boot, run cluster acceptance checks separately.
 
 ## Current implementation status
 
 Provisioning uses inventory MACs on an isolated, trusted private network.
 
-**Warewulf, Slurm, storage, Spack and Lmod implement the core entry points.**
-The default selection runs all five components. Spack builds software and
+**Warewulf, Slurm, storage, Spack, Lmod and ELK implement the core entry points.**
+The default selection runs all six components. Spack builds software and
 generates module files; Lmod installs their runtime and Bash initialization.
 The existing setup directory remains unchanged.
 Component tasks have local syntax/template/guard tests; physical PXE boot,
@@ -27,6 +28,18 @@ before host access if their component entry points are missing. A complete plan
 establishes file availability; it does not establish deployment readiness.
 The component entry points and their order are listed below.
 See [component deployment inputs](../components/README.md) before installation.
+
+## ELK logging
+
+ELK now runs in the default deployment, after Lmod and before publication.
+The head hosts Elasticsearch, Logstash, Kibana and Filebeat; CPUs receive only
+Filebeat. Preflight checks at least 7 GiB total head RAM and 10 GiB initial free
+disk space. After deployment, reboot CPUs into the new image, then run
+`verify.yml` to test delivery of a journal message from every CPU.
+Kibana is loopback-only and accessed through an SSH tunnel. Local head users
+are trusted; authentication and encryption are not configured for this isolated
+lab. See the [ELK guide](../components/elk/README.md) for commands, retention,
+resource requirements and network limitations.
 
 ## Configuration
 
@@ -86,7 +99,7 @@ ansible-playbook core/playbooks/site.yml -e core_action=plan
 # Read-only setup, topology, capacity, identity and provisioning-input checks.
 ansible-playbook core/playbooks/site.yml -e core_action=preflight -K
 
-# Reconcile all five components and publish the CPU image.
+# Reconcile all six components and publish the CPU image.
 ansible-playbook core/playbooks/site.yml -K
 
 # After booting CPU nodes with the published image:
@@ -184,10 +197,10 @@ ansible-playbook core/playbooks/verify.yml -K \
   -e '{"core_components":["warewulf","slurm","spack"]}'
 ~~~
 
-Warewulf is required. Other supported selections are Slurm, storage, Spack and Lmod;
+Warewulf is required. Other supported selections are Slurm, storage, Spack, Lmod and ELK;
 Lmod requires Spack. Selection does not uninstall previously installed components.
 With the default `core_stage=full`, all required phases for selected components
-run in the declared order. GPU scheduling, ELK, Grafana, Apptainer, eRaider and
+run in the declared order. GPU scheduling, Grafana, Apptainer, eRaider and
 Globus are outside this milestone.
 
 ### GPU initialization entrypoint
@@ -235,7 +248,9 @@ task files through `tasks/phase.yml`:
 | 8 | `spack/tasks/cpu_image.yml` | Read-only software mount and Spack shell integration |
 | 9 | `lmod/tasks/head.yml` | Head module runtime and shell integration |
 | 10 | `lmod/tasks/cpu_image.yml` | CPU module runtime and shell integration |
-| 11 | `warewulf/tasks/publish.yml` | Build and activate the complete image and overlays |
+| 11 | `elk/tasks/head.yml` | Logging services, index retention and head ingestion check |
+| 12 | `elk/tasks/cpu_image.yml` | CPU Filebeat configuration and boot service |
+| 13 | `warewulf/tasks/publish.yml` | Build and activate the complete image and overlays |
 
 Only selected components run. After each phase, handlers finish before its
 checkpoint is saved. Full deployment then verifies the served release and
@@ -486,3 +501,12 @@ Component tests additionally exercise actual Ansible template lookup for image
 heredoc boundaries, extracted shell-profile syntax, incomplete image-script
 rejection, and root SSH key preservation/configuration in temporary directories.
 They do not publish images, reboot nodes or establish live cluster acceptance.
+
+## Component observability
+
+Selecting `elk` adds a local telemetry helper before installation and preserves
+bounded deployment task diagnostics in the deployment `always` block. The normal
+ELK phases install collectors and a one-minute observation timer on the head and
+CPU image. Post-boot verification checks file delivery, Lmod hooks, a Spack
+operation and a real Slurm job completion, in addition to journal probes.
+See [the coverage and limitations](../components/elk/OBSERVABILITY.md).

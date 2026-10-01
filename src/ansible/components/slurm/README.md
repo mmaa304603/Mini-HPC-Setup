@@ -127,3 +127,10 @@ See [local tests](../tests/README.md) and
 [Slurm configuration reference](https://slurm.schedmd.com/slurm.conf.html).
 Time checks use [Chrony's waitsync command](https://chrony-project.org/doc/3.1/chronyc.html),
 which tests synchronization and remaining clock correction.
+
+## Optional ELK observability
+
+When `elk` is selected, core also enables this component's managed telemetry.
+See [ELK collection and verification](../elk/OBSERVABILITY.md) for sources,
+retention, test commands and coverage limits. Normal component operations do not
+wait for Elasticsearch.

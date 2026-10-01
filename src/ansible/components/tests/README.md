@@ -46,6 +46,7 @@ This focused command does not include the runner's static role syntax check.
 | --- | --- |
 | `test_components.py` | Rendered configuration, root/controller public keys, image execution guard, identity collisions, repeatable file updates, publication fingerprints and entry points. |
 | `test_slurm.py` | Unsynchronized clocks, wrong selected NTP source and Munge decoding failures stop acceptance; credential output remains hidden. These use command stubs. |
+| `test_warewulf_mount.py` | Accepts read-only NFS beneath a systemd automount; rejects missing, duplicate, writable or incorrect exports using the real acceptance assertion. Checks the findmnt command locally without mounting anything. |
 | `test_storage.py` | Refusal of root/wrong/read-only/undersized data filesystems, existing identity and project membership validation, required worker mounts and private NFS firewall access without Spack. |
 | `test_software.py` | Missing/existing fstab handling, corrupt lockfiles, noninteractive Spack installation under a pseudo-terminal, lazy Spack initialization, Lmod paths and rejection of the wrong executable. |
 | `test_hardening.py` | Ownership migration with symlinks and internal/external hardlinks, pinned inputs, and optional real Warewulf overlay rendering. Ownership changes are mocked. |
@@ -96,3 +97,26 @@ Use the same component selection as the deployment. Live acceptance contacts
 the head and workers and runs bounded software/Slurm jobs; it is not part of
 the local regression runner. See the [component overview](../README.md) and
 [core recovery and verification](../../core/README.md#recovery-and-verification).
+
+## ELK checks
+
+`test_elk.py` renders loopback API/private-ingestion configuration, checks
+journal and Slurm collection, executes memory/version admission conditions in
+Ansible, and verifies that matching lifecycle/template/alias state needs no
+write. When Filebeat is installed, its real configuration validator checks the
+rendered agent configuration with and without Slurm, using temporary data/log
+paths. This catches incompatible queue settings that YAML parsing cannot detect;
+the binary check is skipped when Filebeat is absent. Image rendering checks
+include ELK's Filebeat setup. The syntax pass
+imports ELK's real preflight/head/image/verify tasks. No Elastic services are
+installed or started; live ingestion is checked by deployment and `verify.yml`.
+
+`test_telemetry.py` exercises bounded failed-command capture, exit-code
+preservation, file rotation, symlink refusal, secret/no_log omission and Lmod
+hooks. When installed, real Lmod is exercised against temporary modulefiles with
+syslog redirected to a temporary file. No live module profile is modified.
+
+`test_log_reader.py` verifies token/route checks, query bounds and rejection of
+arbitrary Elasticsearch DSL. `HPC_TEST_LOGSTASH=1` enables the installed Logstash
+stdin/stdout parsing test for real Slurm completion records and structured events;
+it uses temporary runtime paths and never contacts the live Elasticsearch service.

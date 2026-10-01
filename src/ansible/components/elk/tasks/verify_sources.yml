@@ -1,0 +1,72 @@
+---
+- name: Identify the tested node's actual log hostname
+  ansible.builtin.command:
+    argv: [hostname]
+  delegate_to: '{{ elk_source_host }}'
+  register: elk_source_hostname
+  changed_when: false
+- name: Emit a record through the actual managed file input
+  ansible.builtin.command:
+    argv: [/usr/local/libexec/hpc-telemetry, probe, '{{ elk_probe }}']
+  delegate_to: '{{ elk_source_host }}'
+  changed_when: false
+- name: Exercise the node observation collector
+  ansible.builtin.command:
+    argv: [/usr/local/libexec/hpc-telemetry, snapshot]
+  environment:
+    HPC_LOG_PROBE: '{{ elk_probe }}'
+  delegate_to: '{{ elk_source_host }}'
+  changed_when: false
+- name: Require the file probe and fresh health observation from this host
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    method: POST
+    body_format: json
+    body:
+      query:
+        bool:
+          filter:
+            - term: {host.name: '{{ elk_source_hostname.stdout }}'}
+            - term: {event.dataset.keyword: '{{ item }}'}
+            - term: {hpc.probe.id.keyword: '{{ elk_probe }}'}
+    use_proxy: false
+  loop: [hpc.probe, hpc.health]
+  register: elk_source_event
+  until: elk_source_event.status == 200 and (elk_source_event.json.count | default(0) | int) > 0
+  retries: 24
+  delay: 5
+- name: Exercise Lmod load and unload hooks in an isolated shell
+  ansible.builtin.shell: |
+    set -eo pipefail
+    . /etc/profile.d/z10-hpc-lmod.sh
+    module --ignore_cache load {{ hpc_spack_module_test.name | quote }}
+    module unload {{ hpc_spack_module_test.name | quote }}
+  args:
+    executable: /bin/bash
+  environment:
+    HPC_LOG_PROBE: '{{ elk_probe }}'
+  delegate_to: '{{ elk_source_host }}'
+  become: true
+  become_user: nobody
+  changed_when: false
+  when: "'lmod' in core_components"
+- name: Require both Lmod actions with this probe and host
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    method: POST
+    body_format: json
+    body:
+      query:
+        bool:
+          filter:
+            - term: {host.name: '{{ elk_source_hostname.stdout }}'}
+            - term: {event.dataset.keyword: hpc.lmod}
+            - term: {event.action.keyword: '{{ item }}'}
+            - term: {hpc.probe.id.keyword: '{{ elk_probe }}'}
+    use_proxy: false
+  loop: [load, unload]
+  register: elk_lmod_event
+  until: elk_lmod_event.status == 200 and (elk_lmod_event.json.count | default(0) | int) > 0
+  retries: 24
+  delay: 5
+  when: "'lmod' in core_components"

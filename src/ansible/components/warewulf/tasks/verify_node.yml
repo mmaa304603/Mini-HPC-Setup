@@ -26,15 +26,26 @@
   when: "'spack' in core_components"
 - name: Inspect the software filesystem
   ansible.builtin.command:
-    argv: [findmnt, -J, -T, "{{ warewulf_spack_export }}"]
+    argv: [findmnt, --json, --list, --mountpoint, "{{ warewulf_spack_export }}", --output, 'TARGET,SOURCE,FSTYPE,OPTIONS']
   delegate_to: "{{ warewulf_verify_node.name }}"
   register: warewulf_software_mount
   changed_when: false
   when: "'spack' in core_components"
 - name: Require the head's read-only NFS software export
+  vars:
+    # systemd automounts can return an autofs row before the mounted NFS row.
+    warewulf_software_nfs_mounts: >-
+      {{ (warewulf_software_mount.stdout | from_json).filesystems | default([])
+         | selectattr('target', 'equalto', warewulf_spack_export)
+         | selectattr('fstype', 'in', ['nfs', 'nfs4']) | list }}
   ansible.builtin.assert:
     that:
-      - (warewulf_software_mount.stdout | from_json).filesystems[0].source == core_cluster.head.address ~ ':' ~ warewulf_spack_export
-      - (warewulf_software_mount.stdout | from_json).filesystems[0].fstype in ['nfs', 'nfs4']
-      - "'ro' in (warewulf_software_mount.stdout | from_json).filesystems[0].options.split(',')"
+      - warewulf_software_nfs_mounts | length == 1
+      - warewulf_software_nfs_mounts[0].source == core_cluster.head.address ~ ':' ~ warewulf_spack_export
+      - "'ro' in warewulf_software_nfs_mounts[0].options.split(',')"
+      - "'rw' not in warewulf_software_nfs_mounts[0].options.split(',')"
+    fail_msg: >-
+      {{ warewulf_verify_node.name }} must mount
+      {{ core_cluster.head.address }}:{{ warewulf_spack_export }} read-only at
+      {{ warewulf_spack_export }}. Observed mounts: {{ warewulf_software_mount.stdout }}
   when: "'spack' in core_components"

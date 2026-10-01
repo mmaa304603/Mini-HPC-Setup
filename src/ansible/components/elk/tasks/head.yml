@@ -1,0 +1,214 @@
+---
+- ansible.builtin.import_tasks: preflight.yml
+
+- name: Create the core state directory
+  ansible.builtin.file:
+    path: /var/lib/hpc-setup
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+- name: Record ownership before installing the managed stack
+  ansible.builtin.copy:
+    dest: /var/lib/hpc-setup/elk-managed
+    content: "Managed by the core elk role. Local trusted users only.\n"
+    owner: root
+    group: root
+    mode: '0600'
+- name: Import the Elastic package signing key
+  ansible.builtin.rpm_key:
+    key: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    fingerprint: 46095ACC8548582C1A2699A9D27D666CD88E42B4
+    state: present
+- name: Configure the disabled-by-default signed Elastic repository
+  ansible.builtin.template:
+    src: elastic.repo.j2
+    dest: /etc/yum.repos.d/hpc-elastic.repo
+    mode: '0644'
+- name: Install matching Elastic packages and the local log shipper
+  ansible.builtin.dnf:
+    name:
+      - 'elasticsearch-{{ elk_version }}'
+      - 'logstash-{{ elk_version }}'
+      - 'kibana-{{ elk_version }}'
+      - 'filebeat-{{ elk_version }}'
+      - curl
+      - logrotate
+    enablerepo: hpc-elastic
+    state: present
+
+- name: Create service override directories
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/elasticsearch/jvm.options.d
+    - /etc/systemd/system/logstash.service.d
+    - /etc/systemd/system/kibana.service.d
+
+- name: Configure loopback-only Elasticsearch
+  ansible.builtin.template:
+    src: elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+    mode: '0640'
+  notify: ELK restart Elasticsearch
+- name: Set Elasticsearch heap without replacing vendor JVM options
+  ansible.builtin.template:
+    src: jvm.options.j2
+    dest: /etc/elasticsearch/jvm.options.d/hpc.options
+    owner: root
+    group: elasticsearch
+    mode: '0640'
+  notify: ELK restart Elasticsearch
+# Apply configuration notifications first, so a fresh install starts only once.
+- ansible.builtin.meta: flush_handlers
+- name: Ensure Elasticsearch is enabled and running
+  ansible.builtin.include_tasks: elasticsearch_service.yml
+  vars:
+    elk_elasticsearch_state: started
+- name: Wait for Elasticsearch to recover its indexes
+  ansible.builtin.uri:
+    url: 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s'
+    use_proxy: false
+  register: elk_es_ready
+  until: elk_es_ready.status == 200
+  retries: 30
+  delay: 5
+
+- name: Configure normal and short-lived build-log retention
+  ansible.builtin.include_tasks: index.yml
+  vars:
+    elk_index_name: '{{ elk_index.name }}'
+    elk_index_retention: '{{ elk_index.days }}'
+    elk_index_rollover: '{{ elk_index.size }}'
+  loop:
+    - {name: hpc-logs, days: '{{ elk_retention_days }}', size: '{{ elk_rollover_size }}'}
+    - {name: hpc-logs-build, days: 2, size: 128mb}
+  loop_control:
+    loop_var: elk_index
+
+- name: Configure the Logstash service
+  ansible.builtin.template:
+    src: logstash.yml.j2
+    dest: /etc/logstash/logstash.yml
+    owner: root
+    group: logstash
+    mode: '0640'
+  notify: ELK restart Logstash
+- name: Configure the dedicated HPC pipeline
+  ansible.builtin.template:
+    src: logstash.conf.j2
+    dest: /etc/logstash/conf.d/hpc.conf
+    owner: root
+    group: logstash
+    mode: '0640'
+  notify: ELK restart Logstash
+- name: Select only the managed pipeline without deleting other files
+  ansible.builtin.copy:
+    dest: /etc/logstash/pipelines.yml
+    content: |
+      - pipeline.id: main
+        path.config: /etc/logstash/conf.d/hpc.conf
+    owner: root
+    group: logstash
+    mode: '0640'
+  notify: ELK restart Logstash
+- name: Bound Logstash heap and direct memory
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/logstash.service.d/hpc.conf
+    content: |
+      [Service]
+      Environment="LS_JAVA_OPTS=-Xms{{ elk_logstash_heap_mb }}m -Xmx{{ elk_logstash_heap_mb }}m -XX:MaxDirectMemorySize=256m"
+    mode: '0644'
+  notify: ELK restart Logstash
+- name: Configure loopback-only Kibana
+  ansible.builtin.template:
+    src: kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: root
+    group: kibana
+    mode: '0640'
+  notify: ELK restart Kibana
+- name: Bound Kibana heap
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/kibana.service.d/hpc.conf
+    content: |
+      [Service]
+      Environment="NODE_OPTIONS=--max-old-space-size={{ elk_kibana_heap_mb }}"
+    mode: '0644'
+  notify: ELK restart Kibana
+- name: Install local observation and rotation configuration
+  ansible.builtin.template:
+    src: '{{ item.src }}'
+    dest: '{{ item.dest }}'
+    mode: '0644'
+  loop:
+    - {src: telemetry.json.j2, dest: /etc/hpc-telemetry.json}
+    - {src: telemetry.service.j2, dest: /etc/systemd/system/hpc-telemetry.service}
+    - {src: telemetry.timer.j2, dest: /etc/systemd/system/hpc-telemetry.timer}
+- name: Bound the new Slurm completion log through system log rotation
+  ansible.builtin.template:
+    src: job-logrotate.j2
+    dest: /etc/logrotate.d/hpc-job-completion
+    mode: '0644'
+  when: "'slurm' in core_components"
+- name: Enable periodic node observations
+  ansible.builtin.systemd:
+    name: hpc-telemetry.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+- ansible.builtin.import_tasks: reader.yml
+- name: Configure head Filebeat
+  ansible.builtin.template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    owner: root
+    group: root
+    mode: '0600'
+    validate: '/usr/bin/filebeat test config -c %s -e'
+  notify: ELK restart Filebeat
+- name: Enable logging services
+  ansible.builtin.systemd:
+    name: '{{ item }}'
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: [logstash, kibana, filebeat]
+- ansible.builtin.meta: flush_handlers
+- ansible.builtin.import_tasks: health.yml
+- name: Read the managed Kibana data view
+  ansible.builtin.uri:
+    url: http://127.0.0.1:5601/api/data_views/data_view/hpc-logs
+    status_code: [200, 404]
+    use_proxy: false
+  register: elk_view
+- name: Create or reconcile the HPC log data view
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:5601/api/data_views/data_view{{ '/hpc-logs' if elk_view.status == 200 else '' }}"
+    method: POST
+    headers: {kbn-xsrf: hpc-core}
+    body_format: json
+    body:
+      data_view:
+        id: hpc-logs
+        title: hpc-logs-*
+        timeFieldName: '@timestamp'
+    use_proxy: false
+  when: >-
+    elk_view.status == 404 or
+    elk_view.json.data_view.title != 'hpc-logs-*' or
+    elk_view.json.data_view.timeFieldName | default('') != '@timestamp'
+  changed_when: true
+- ansible.builtin.include_tasks: verify_ingestion.yml
+  vars:
+    elk_test_hosts: ['{{ inventory_hostname }}']
+
+- name: Verify head file collection, observations and selected module hooks
+  ansible.builtin.include_tasks: verify_sources.yml
+  vars:
+    elk_source_host: '{{ inventory_hostname }}'
+- ansible.builtin.import_tasks: verify_reader.yml

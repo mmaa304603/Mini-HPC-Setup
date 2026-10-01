@@ -6,7 +6,7 @@
       - core_stage in ['full', 'warewulf_prepare']
       - core_stage != 'warewulf_prepare' or (core_components == ['warewulf'] and core_action != 'verify')
       - core_components is sequence and core_components is not string and core_components is not mapping
-      - core_components | difference(['warewulf', 'slurm', 'storage', 'spack', 'lmod']) | length == 0
+      - core_components | difference(['warewulf', 'slurm', 'storage', 'spack', 'lmod', 'elk']) | length == 0
       - core_components | unique | length == core_components | length
       - "'warewulf' in core_components"
       - "'lmod' not in core_components or 'spack' in core_components"
@@ -106,7 +106,7 @@
   ansible.builtin.debug:
     msg: >-
       Warewulf head and image preparation finished. This run did not publish
-      an image or overlays, or configure Slurm, Spack or Lmod. Provisioning
+      an image or overlays, or configure Slurm, storage, Spack, Lmod or ELK. Provisioning
       services are active; existing published artifacts may still be served.
       Run a full deployment with the intended components before boot verification.
   when: core_action == 'deploy' and core_stage == 'warewulf_prepare'

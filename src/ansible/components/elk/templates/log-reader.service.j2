@@ -1,0 +1,18 @@
+[Unit]
+Description=Restricted read-only HPC log query API
+After=network.target elasticsearch.service
+[Service]
+Type=simple
+DynamicUser=yes
+EnvironmentFile=/etc/hpc-log-reader.env
+ExecStart=/usr/bin/python3 /usr/local/libexec/hpc-log-reader
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+MemoryMax=128M
+TasksMax=8
+[Install]
+WantedBy=multi-user.target

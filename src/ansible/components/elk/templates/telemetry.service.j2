@@ -1,0 +1,13 @@
+[Unit]
+Description=HPC node observations and log delivery freshness
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/hpc-telemetry snapshot
+TimeoutStartSec=90
+Nice=10
+UMask=0027
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/hpc-telemetry

@@ -1,0 +1,17 @@
+---
+# Runs before component installation so failed first deployments leave evidence.
+- name: Create bounded local telemetry directories
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: [/usr/local/libexec, /var/log/hpc-telemetry]
+- name: Install the local event and snapshot helper
+  ansible.builtin.template:
+    src: telemetry.py.j2
+    dest: /usr/local/libexec/hpc-telemetry
+    owner: root
+    group: root
+    mode: '0755'

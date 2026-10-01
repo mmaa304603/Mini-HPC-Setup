@@ -1,35 +1,51 @@
 input {
   beats {
+    host => "{{ core_cluster.head.address }}"
     port => 5044
-  }
-  tcp {
-    port => 5000
-  }
-  syslog {
-    port => 5140
+    event_loop_threads => 1
+    executor_threads => 1
   }
 }
-
 filter {
-  if [type] == "syslog" {
-    grok {
-      match => { "message" => "%{SYSLOGBASE} %{GREEDYDATA:syslog_message}" }
+  if [hpc_payload] {
+    # Promote only our schema; never let a payload choose an index or overwrite host identity.
+    if [hpc_payload][event][dataset] =~ /^hpc\./ {
+      mutate {
+        rename => {
+          "[hpc_payload][event]" => "[event]"
+          "[hpc_payload][hpc]" => "[hpc]"
+          "[hpc_payload][user]" => "[user]"
+          "[hpc_payload][message]" => "[message]"
+        }
+      }
+      if [hpc_payload][@timestamp] {
+        date { match => ["[hpc_payload][@timestamp]", "ISO8601"] }
+      }
+    }
+    mutate { remove_field => ["hpc_payload"] }
+  }
+  if [log][file][path] =~ /job-completion\.log$/ {
+    mutate { replace => { "[event][dataset]" => "hpc.slurm.job" } }
+    kv {
+      source => "message"
+      target => "[hpc][slurm]"
+      field_split_pattern => "[[:space:]]+(?=[A-Za-z][A-Za-z0-9_]*=)"
+      include_keys => ["JobId", "UserId", "GroupId", "Name", "JobState", "ExitCode", "NodeList", "StartTime", "EndTime", "Partition"]
     }
   }
-  
-  if [type] == "slurm" {
-    grok {
-      match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{WORD:component} %{GREEDYDATA:slurm_message}" }
-    }
+  mutate { replace => { "[@metadata][hpc_index]" => "hpc-logs" } }
+  if [event][dataset] == "hpc.spack.build" {
+    mutate { replace => { "[@metadata][hpc_index]" => "hpc-logs-build" } }
   }
+  # An explicit ingestion clock lets readers measure delivery lag and detect replay.
+  ruby { code => 'event.set("[event][ingested]", LogStash::Timestamp.now)' }
 }
-
 output {
   elasticsearch {
-    hosts => ["localhost:9200"]
-    index => "logstash-%{+YYYY.MM.dd}"
-    user => "{{ elasticsearch_user }}"
-    password => "{{ elasticsearch_password }}"
+    hosts => ["http://127.0.0.1:9200"]
+    index => "%{[@metadata][hpc_index]}"
+    data_stream => false
+    ilm_enabled => false
+    manage_template => false
   }
-  stdout { codec => rubydebug }
-} 
+}

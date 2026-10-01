@@ -39,6 +39,13 @@
     public: false
   when: "'storage' in core_components"
 
+- name: Validate ELK capacity and existing installation before any changes
+  ansible.builtin.include_role:
+    name: "{{ core_components_dir }}/elk"
+    tasks_from: preflight
+    public: false
+  when: "'elk' in core_components"
+
 - name: Require the supported head operating system
   ansible.builtin.assert:
     that:

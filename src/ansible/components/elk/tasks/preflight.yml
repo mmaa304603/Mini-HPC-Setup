@@ -1,0 +1,75 @@
+---
+- name: Validate the small-cluster ELK settings
+  ansible.builtin.assert:
+    that:
+      - elk_version is match('^9\.[0-9]+\.[0-9]+$')
+      - elk_elasticsearch_heap_mb | int >= 512
+      - elk_logstash_heap_mb | int >= 512
+      - elk_kibana_heap_mb | int >= 512
+      - elk_pipeline_workers | int >= 1
+      - elk_pipeline_workers | int <= 4
+      - elk_retention_days | int >= 1
+      - elk_rollover_size is match('^[1-9][0-9]*(mb|gb)$')
+    fail_msg: Review the ELK version, memory and retention settings in config/group_vars/all.yml.
+
+- name: Read head memory capacity
+  ansible.builtin.slurp:
+    src: /proc/meminfo
+  register: elk_meminfo
+
+- name: Require memory for ELK and the existing head services
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((elk_meminfo.content | b64decode | regex_findall('(?m)^MemTotal: +([0-9]+)') | first | int) // 1024)
+        >= ([elk_min_memory_mb | int, (elk_elasticsearch_heap_mb | int) + (elk_logstash_heap_mb | int) + (elk_kibana_heap_mb | int) + 4096] | max)
+    fail_msg: ELK needs at least 7 GiB head RAM with the default heaps; increase VM RAM before deployment.
+
+- name: Read installed Elastic package versions without changing them
+  ansible.builtin.command:
+    argv: [rpm, -q, --qf, '%{VERSION}', '{{ item }}']
+  loop: [elasticsearch, logstash, kibana, filebeat]
+  register: elk_installed
+  changed_when: false
+  failed_when: elk_installed.rc not in [0, 1]
+  check_mode: false
+
+- name: Refuse implicit Elastic upgrades or downgrades
+  ansible.builtin.assert:
+    that: item.rc == 1 or item.stdout == elk_version
+    fail_msg: >-
+      {{ item.item }} is already installed at another version. Back up its data
+      and follow Elastic's upgrade procedure; core does not perform data migrations.
+  loop: '{{ elk_installed.results }}'
+  loop_control:
+    label: '{{ item.item }}'
+
+- name: Inspect ELK ownership marker and existing Elasticsearch data
+  ansible.builtin.stat:
+    path: '{{ item }}'
+  loop: [/var/lib/hpc-setup/elk-managed, /var/lib/elasticsearch, /etc/elasticsearch/elasticsearch.yml]
+  register: elk_existing
+
+- name: Refuse replacing an independently managed Elasticsearch deployment
+  ansible.builtin.assert:
+    that: >-
+      (elk_existing.results[0].stat.isreg | default(false)) or
+      (not elk_existing.results[1].stat.exists and not elk_existing.results[2].stat.exists)
+    fail_msg: Existing Elasticsearch is not owned by core. Migrate it explicitly before selecting elk.
+
+- name: Read space available for the ELK installation and log data
+  ansible.builtin.command:
+    argv: [df, -B1, --output=avail, /var/lib]
+  register: elk_disk
+  changed_when: false
+  check_mode: false
+  when: core_action in ['preflight', 'deploy']
+
+- name: Require disk headroom before installing ELK
+  ansible.builtin.assert:
+    that: >-
+      (elk_disk.stdout_lines | last | trim | int) >=
+      ((elk_min_free_bytes | int) if (elk_installed.results | selectattr('rc', 'equalto', 1) | list | length) > 0
+       else (core_min_free_bytes | default(6442450944) | int))
+    fail_msg: ELK needs 10 GiB free for initial installation, or the core disk reserve on reruns (6 GiB by default).
+  when: core_action in ['preflight', 'deploy']

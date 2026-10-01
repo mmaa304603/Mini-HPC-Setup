@@ -11,6 +11,8 @@ core_deploy_phases:
   - {component: spack, entry: cpu_image}
   - {component: lmod, entry: head}
   - {component: lmod, entry: cpu_image}
+  - {component: elk, entry: head}
+  - {component: elk, entry: cpu_image}
   - {component: warewulf, entry: publish}
 core_verify_phases:
   - {component: warewulf, entry: verify}
@@ -18,3 +20,4 @@ core_verify_phases:
   - {component: slurm, entry: verify}
   - {component: spack, entry: verify}
   - {component: lmod, entry: verify}
+  - {component: elk, entry: verify}

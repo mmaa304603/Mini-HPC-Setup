@@ -1,0 +1,23 @@
+-- Managed HPC usage telemetry. Local syslog only; hook errors never block modules.
+local hook = require('Hook')
+local function json(value)
+    return '"' .. tostring(value or ''):gsub('[%z\1-\31\\"]', function(c)
+        return string.format('\\u%04x', string.byte(c))
+    end) .. '"'
+end
+local function report(action, t)
+    pcall(function()
+        local posix = require('posix')
+        local api = type(posix.syslog) == 'table' and posix.syslog or posix
+        local payload = '{"event":{"dataset":"hpc.lmod","action":' .. json(action) ..
+            ',"outcome":"success"},"message":' .. json(action .. ' ' .. t.modFullName) ..
+            ',"user":{"name":' .. json(os.getenv('USER')) .. '},"hpc":{"module":{"name":' ..
+            json(t.modFullName) .. '},"job":{"id":' .. json(os.getenv('SLURM_JOB_ID')) ..
+            '},"probe":{"id":' .. json(os.getenv('HPC_LOG_PROBE')) .. '}}}'
+        api.openlog('hpc-lmod')
+        api.syslog(6, payload)
+        api.closelog()
+    end)
+end
+hook.register('load', function(t) report('load', t) end)
+hook.register('unload', function(t) report('unload', t) end)

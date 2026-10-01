@@ -1,24 +1,12 @@
 ---
-# Elasticsearch configuration
-elasticsearch_heap_size: "2g"
-elasticsearch_user: "elastic"
-elasticsearch_password: "changeme"  # Change this in production!
-
-# Logstash configuration
-logstash_pipeline_workers: 2
-logstash_batch_size: 125
-logstash_batch_delay: 50
-
-# Kibana configuration
-kibana_port: 5601
-kibana_host: "0.0.0.0"
-
-# Filebeat configuration (for client nodes)
-filebeat_enabled: true
-filebeat_config:
-  - type: "system"
-    enabled: true
-  - type: "slurm"
-    enabled: true
-  - type: "spack"
-    enabled: true 
+# All four packages use the same pinned major/minor/patch. No automatic upgrades.
+elk_version: '9.5.4'
+elk_elasticsearch_heap_mb: 512
+elk_logstash_heap_mb: 512
+elk_kibana_heap_mb: 2048
+elk_pipeline_workers: 1
+elk_retention_days: 7
+elk_rollover_size: 1gb
+# Admission thresholds; the defaults leave room for the existing head services.
+elk_min_memory_mb: 7168
+elk_min_free_bytes: 10737418240

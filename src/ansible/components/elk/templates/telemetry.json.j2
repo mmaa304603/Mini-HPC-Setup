@@ -1,0 +1,11 @@
+{
+  "head": {{ (not (elk_image | default(false))) | to_json }},
+  "node": {{ ('' if elk_image | default(false) else core_cluster.head.name) | to_json }},
+  "nodes": {{ ([core_cluster.head.name] + (core_cluster.cpu_nodes | map(attribute='name') | list)) | to_json }},
+  "services": {{ (['filebeat'] + (['slurmd', 'munge', 'chronyd'] if 'slurm' in core_components else []) if elk_image | default(false) else ['elasticsearch', 'logstash', 'kibana', 'filebeat', 'hpc-log-reader', 'warewulfd', 'dhcpd', 'tftp.socket'] + (['slurmctld', 'munge', 'chronyd'] if 'slurm' in core_components else []) + (['nfs-server'] if 'storage' in core_components else [])) | to_json }},
+  "commands": {
+    "warewulf-nodes": ["wwctl", "node", "status"]{% if 'slurm' in core_components %},
+    "slurm-nodes": ["sinfo", "--noheader", "--format=%N|%T|%E"],
+    "slurm-queue": ["squeue", "--noheader", "--format=%i|%u|%T|%M|%D|%R"]{% endif %}
+  }
+}

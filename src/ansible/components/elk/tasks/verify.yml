@@ -1,0 +1,23 @@
+---
+- ansible.builtin.import_tasks: health.yml
+- name: Check Filebeat on each booted CPU node
+  ansible.builtin.command:
+    argv: [systemctl, is-active, filebeat]
+  delegate_to: '{{ item }}'
+  loop: '{{ groups.cpu_nodes }}'
+  changed_when: false
+- ansible.builtin.include_tasks: verify_ingestion.yml
+  vars:
+    elk_test_hosts: '{{ [inventory_hostname] + groups.cpu_nodes }}'
+- name: Resolve the installed module for the source probes
+  ansible.builtin.include_role:
+    name: '{{ role_path }}/../spack'
+    tasks_from: module_context
+  when: "'lmod' in core_components"
+- name: Verify managed files, node observations and module events on every CPU and head
+  ansible.builtin.include_tasks: verify_sources.yml
+  loop: '{{ [inventory_hostname] + groups.cpu_nodes }}'
+  loop_control:
+    loop_var: elk_source_host
+- ansible.builtin.import_tasks: verify_operations.yml
+- ansible.builtin.import_tasks: verify_reader.yml

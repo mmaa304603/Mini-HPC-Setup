@@ -20,7 +20,7 @@ The CPU core workflow configures CPUs only. The separate
 preinstalled Jetson over SSH. Set its normal `ansible_user` in `gpu_nodes.yml`
 before using live GPU actions; its static address remains in `hosts.yml`.
 
-`group_vars/all.yml` selects Warewulf, Slurm, storage, Spack and Lmod, the DHCP range and
+`group_vars/all.yml` selects Warewulf, Slurm, storage, Spack, Lmod and ELK, the DHCP range and
 CPU image, and software overrides. Ansible automatically loads this file next
 to the inventory. Component defaults stay with their roles; add overrides only
 when needed. There are no dev/test/prod copies for this single cluster.
@@ -41,9 +41,9 @@ own `setup/ansible.cfg`. Tests use temporary inventories and recording roles,
 not this cluster's live machines. These YAML files configure the Ansible core;
 the shell implementation continues to use its existing configuration files.
 
-Warewulf, Slurm, storage, Spack and Lmod entry points are implemented. Supply the controller
+Warewulf, Slurm, storage, Spack, Lmod and ELK entry points are implemented. Supply the controller
 public SSH keys in warewulf_authorized_keys, verify usable Slurm memory, and
-review compute DNS before installation. The default selection deploys all five.
+review compute DNS before installation. The default selection deploys all six.
 The default `storage_backend: loop` reserves `storage_size_gib: 5` from existing
 root-disk space in `/var/lib/hpc-storage/shared.img`, then mounts it at `/shared`.
 No extra disk or UUID configuration is required; initial creation requires at
@@ -57,3 +57,13 @@ See the
 [core README](../src/ansible/core/README.md) for commands, current limitations,
 and the required component entry points. Do not store Munge keys or passwords
 in these files.
+
+## ELK logging inputs
+
+`elk` is included in the default component selection. `elk_version` pins all
+four Elastic packages; `elk_retention_days` and `elk_rollover_size` control
+index lifecycle. Initial admission requires 7 GiB head RAM and 10 GiB free
+under `/var/lib`; installed-stack reruns use the core disk reserve.
+Kibana and management APIs bind to loopback; TCP 5044 accepts unencrypted
+logs only on the private cluster interface. Local head users are trusted.
+See the [ELK guide](../src/ansible/components/elk/README.md) before deployment.

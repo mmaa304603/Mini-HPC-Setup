@@ -1,5 +1,5 @@
 ---
-core_components: [warewulf, slurm, storage, spack, lmod]
+core_components: [warewulf, slurm, storage, spack, lmod, elk]
 # Reserve existing root-disk space in /var/lib/hpc-storage/shared.img.
 # No extra disk or manually supplied UUID is required.
 storage_backend: loop
@@ -25,3 +25,10 @@ spack_packages: [hdf5]             # Expand after the first job works.
 # When changing the representative package, also override spack_verify_command
 # (default: [h5dump, -V]) and optionally spack_verify_spec (default: first spec).
 # spack_build_jobs defaults to 4; lower it if builds compete with head services.
+
+# ELK: head services + Filebeat in the CPU image; Kibana uses an SSH tunnel.
+# Requires at least 7 GiB head RAM and 10 GiB free under /var/lib.
+elk_version: '9.5.4'
+elk_retention_days: 7
+elk_rollover_size: 1gb
+elk_kibana_heap_mb: 2048

@@ -1,5 +1,8 @@
 # Managed by Mini-HPC. Initialize Bash locally; do not access NFS at login.
 if [ -n "${BASH_VERSION:-}" ] && [ -r /usr/share/lmod/lmod/init/bash ]; then
+{% if 'elk' in core_components %}
+    export LMOD_PACKAGE_PATH=/etc/hpc-lmod${LMOD_PACKAGE_PATH:+:"$LMOD_PACKAGE_PATH"}
+{% endif %}
     if . /usr/share/lmod/lmod/init/bash; then
         case ":${MODULEPATH:-}:" in
             *:{{ hpc_spack_module_test.module_path }}:*) ;;

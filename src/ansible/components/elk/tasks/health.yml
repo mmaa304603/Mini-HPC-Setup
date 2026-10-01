@@ -1,0 +1,17 @@
+---
+- name: Check logging service health
+  ansible.builtin.command:
+    argv: [systemctl, is-active, elasticsearch, logstash, kibana, filebeat]
+  changed_when: false
+- name: Wait for logging APIs to become ready
+  ansible.builtin.uri:
+    url: '{{ item }}'
+    use_proxy: false
+  loop:
+    - 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s'
+    - http://127.0.0.1:9600/_node/pipelines/main
+    - http://127.0.0.1:5601/api/status
+  register: elk_api
+  until: elk_api.status == 200
+  retries: 30
+  delay: 5

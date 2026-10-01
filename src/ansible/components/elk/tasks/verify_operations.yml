@@ -1,0 +1,62 @@
+---
+- name: Exercise the managed Spack wrapper without building software
+  ansible.builtin.command:
+    argv:
+      - /usr/local/libexec/hpc-telemetry
+      - --output
+      - /var/log/hpc-telemetry/spack/events.jsonl
+      - run
+      - --action
+      - verify
+      - --probe
+      - '{{ elk_probe }}'
+      - --
+      - '{{ spack_install_dir | default("/opt/spack") }}/bin/spack'
+      - --version
+  become: true
+  become_user: hpc-spack
+  changed_when: false
+  when: "'spack' in core_components"
+- name: Require the Spack operation completion record
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    method: POST
+    body_format: json
+    body:
+      query:
+        bool:
+          filter:
+            - term: {event.dataset.keyword: hpc.spack}
+            - term: {event.action.keyword: verify-end}
+            - term: {event.outcome.keyword: success}
+            - term: {hpc.probe.id.keyword: '{{ elk_probe }}'}
+    use_proxy: false
+  register: elk_spack_event
+  until: elk_spack_event.status == 200 and (elk_spack_event.json.count | default(0) | int) > 0
+  retries: 24
+  delay: 5
+  when: "'spack' in core_components"
+- name: Run a named bounded Slurm job for completion-log verification
+  ansible.builtin.command:
+    argv: [timeout, --signal=TERM, --kill-after=10, '90', srun, --immediate=15, '--time=00:01:00', '--ntasks=1', '--cpus-per-task=1', '--chdir=/tmp', '--job-name={{ elk_probe }}', /bin/true]
+  become: true
+  become_user: '{{ (core_setup_contents.content | b64decode | from_yaml).admin_user }}'
+  changed_when: false
+  when: "'slurm' in core_components"
+- name: Require the actual Slurm completion record through its file input
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    method: POST
+    body_format: json
+    body:
+      query:
+        bool:
+          filter:
+            - term: {event.dataset.keyword: hpc.slurm.job}
+            - term: {hpc.slurm.Name.keyword: '{{ elk_probe }}'}
+    use_proxy: false
+  register: elk_job_event
+  until: elk_job_event.status == 200 and (elk_job_event.json.count | default(0) | int) > 0
+  retries: 24
+  delay: 5
+  when: "'slurm' in core_components"

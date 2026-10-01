@@ -1,8 +1,8 @@
 # Ansible components
 
-Warewulf, Slurm, storage, Spack and Lmod implement the staged [core workflow](../core/README.md).
+Warewulf, Slurm, storage, Spack, Lmod and ELK implement the staged [core workflow](../core/README.md).
 Each directory is one Ansible role. Core selects named task entry points;
-the five supported roles' `tasks/main.yml` deliberately fail with directions
+the six supported roles' `tasks/main.yml` deliberately fail with directions
 to use core instead. They are not standalone installation entry points.
 
 | Component | Implemented entry points |
@@ -12,9 +12,10 @@ to use core instead. They are not standalone installation entry points.
 | [Storage](storage/README.md) | preflight, head, cpu_image, verify |
 | [Spack](spack/README.md) | head, cpu_image, verify |
 | [Lmod](lmod/README.md) | head, cpu_image, verify |
+| [ELK](elk/README.md) | preflight, head, cpu_image, verify |
 | [Jetson](jetson/README.md) | preflight, deploy, verify (separate GPU entrypoint) |
 
-The existing Apptainer, ELK, Grafana, Globus and
+The existing Apptainer, Grafana, Globus and
 eRaider roles have not been revised as part of this milestone. The optional
 `core/playbooks/gpu.yml` entrypoint initializes the preinstalled Jetson and
 verifies local CUDA execution. GPU scheduler enrollment remains a later stage.
@@ -37,7 +38,9 @@ The default full deployment runs these phases on the head:
    the CPU's read-only NFS software mount and on-demand Spack shell function.
 5. **Lmod `head` → `cpu_image`:** install the module runtime and Bash integration
    for the shared Spack modules.
-6. **Warewulf `publish`:** snapshot and build the completed image, configure CPU
+6. **ELK `head` → `cpu_image`:** start logging services and head Filebeat,
+   configure index retention and Kibana, and install Filebeat in the CPU image.
+7. **Warewulf `publish`:** snapshot and build the completed image, configure CPU
    nodes and overlays, validate the release, and activate it. Core then runs
    `verify_publication`, including when a valid resume skips publication.
 
@@ -51,6 +54,10 @@ components, and use the same selection for deployment and verification.
 Selection does not uninstall previously installed software. The
 `core_stage=warewulf_prepare` option runs only the first two Warewulf phases;
 it does not publish the changed image or make CPUs ready for acceptance checks.
+
+ELK needs at least 7 GiB head RAM and 10 GiB initial free disk space. It uses
+loopback-only APIs and private-network log ingestion for trusted local users.
+See [ELK](elk/README.md) for SSH tunnel access, retention and resource limits.
 
 ## Before deployment
 
@@ -73,7 +80,7 @@ it at `/shared`, without a manually supplied UUID. Initial preflight requires
 at least 11 GiB free by default. Existing files and block devices are never formatted.
 See [storage setup](storage/README.md).
 
-The current selection is Warewulf, Slurm, storage, Spack and Lmod, with CPU image
+The current selection is Warewulf, Slurm, storage, Spack, Lmod and ELK, with CPU image
 `rockylinux-9.5` and Spack package `hdf5`. DHCP leases use `10.0.1.1–10.0.1.255`;
 the node network overlay applies final CPU addresses `10.0.2.1–10.0.2.3` after
 boot. Both are inside the configured cluster `/22`.

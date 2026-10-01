@@ -1,0 +1,24 @@
+---
+# Keep this nested rescue in its own include: Ansible 2.14 can otherwise skip
+# the enclosing deployment always block on a component failure.
+- name: Preserve deployment diagnostics without preventing lock release
+  block:
+    - name: Copy the bounded controller spool to the head
+      ansible.builtin.copy:
+        src: "{{ lookup('ansible.builtin.env', 'HPC_EVENT_SPOOL') }}"
+        dest: /var/log/hpc-telemetry/deployment.incoming
+        owner: root
+        group: root
+        mode: '0640'
+      no_log: true
+    - name: Append deployment diagnostics to the bounded local spool
+      ansible.builtin.command:
+        argv: [/usr/local/libexec/hpc-telemetry, --output, /var/log/hpc-telemetry/deployment.jsonl, archive, /var/log/hpc-telemetry/deployment.incoming]
+      changed_when: false
+      no_log: true
+  rescue:
+    - name: Report incomplete deployment log collection
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: Deployment diagnostics could not be saved on the head.
+          Log coverage for this run is incomplete; review the Ansible terminal output.

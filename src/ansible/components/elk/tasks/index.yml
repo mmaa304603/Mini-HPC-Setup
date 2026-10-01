@@ -1,0 +1,85 @@
+---
+- name: Define the managed index lifecycle and template
+  ansible.builtin.set_fact:
+    elk_policy:
+      phases:
+        hot:
+          min_age: 0ms
+          actions:
+            rollover: {max_primary_shard_size: "{{ elk_index_rollover | default(elk_rollover_size) }}", max_age: 1d}
+        delete:
+          min_age: "{{ elk_index_retention | default(elk_retention_days) }}d"
+          actions: {delete: {}}
+    elk_index_template:
+      index_patterns: ["{{ elk_index_name | default('hpc-logs') }}-*"]
+      priority: "{{ 210 if elk_index_name | default('hpc-logs') == 'hpc-logs-build' else 200 }}"
+      composed_of: []
+      template:
+        settings:
+          index:
+            number_of_shards: '1'
+            number_of_replicas: '0'
+            lifecycle:
+              name: "{{ elk_index_name | default('hpc-logs') }}"
+              rollover_alias: "{{ elk_index_name | default('hpc-logs') }}"
+        mappings:
+          properties:
+            '@timestamp': {type: date}
+            message: {type: text}
+            host:
+              properties:
+                name: {type: keyword}
+- name: Read the current log retention policy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_ilm/policy/{{ elk_index_name | default('hpc-logs') }}"
+    status_code: [200, 404]
+    use_proxy: false
+  register: elk_policy_read
+- name: Apply the log retention policy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_ilm/policy/{{ elk_index_name | default('hpc-logs') }}"
+    method: PUT
+    body_format: json
+    body: {policy: '{{ elk_policy }}'}
+    use_proxy: false
+  # The API adds defaults to actions; compare managed values and the phase set.
+  when: >-
+    elk_policy_read.status == 404 or
+    (elk_policy_read.json[elk_index_name | default('hpc-logs')].policy.phases.keys() | sort) != (elk_policy.phases.keys() | sort) or
+    (elk_policy_read.json[elk_index_name | default('hpc-logs')].policy | combine(elk_policy, recursive=True)) != elk_policy_read.json[elk_index_name | default('hpc-logs')].policy
+  changed_when: true
+- name: Read the managed index template
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_index_template/{{ elk_index_name | default('hpc-logs') }}"
+    status_code: [200, 404]
+    use_proxy: false
+  register: elk_template_read
+- name: Apply the single-node index template
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_index_template/{{ elk_index_name | default('hpc-logs') }}"
+    method: PUT
+    body_format: json
+    body: '{{ elk_index_template }}'
+    use_proxy: false
+  # Creation/modification timestamps returned by newer Elasticsearch are not inputs.
+  when: >-
+    elk_template_read.status == 404 or
+    (elk_template_read.json.index_templates[0].index_template | combine(elk_index_template, recursive=True)) != elk_template_read.json.index_templates[0].index_template
+  changed_when: true
+- name: Read the log write alias
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/_alias/{{ elk_index_name | default('hpc-logs') }}"
+    status_code: [200, 404]
+    use_proxy: false
+  register: elk_alias
+- name: Bootstrap the first log index without replacing existing data
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:9200/{{ elk_index_name | default('hpc-logs') }}-000001"
+    method: PUT
+    body_format: json
+    # Ansible templates dictionary values, not dictionary keys. Construct the
+    # entire mapping in Jinja so the alias name is evaluated before JSON encoding.
+    body: "{{ {'aliases': {(elk_index_name | default('hpc-logs')): {'is_write_index': true}}} }}"
+    use_proxy: false
+  when: elk_alias.status == 404
+  changed_when: true

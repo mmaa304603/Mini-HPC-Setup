@@ -1,0 +1,53 @@
+---
+- name: Install the restricted read-only query API
+  ansible.builtin.copy:
+    src: log_reader.py
+    dest: /usr/local/libexec/hpc-log-reader
+    owner: root
+    group: root
+    mode: '0755'
+  notify: ELK restart log reader
+- name: Generate a persistent reader token without exposing it to Ansible output
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - |
+        import os, secrets
+        path = '/etc/hpc-log-reader.env'
+        if not os.path.lexists(path):
+            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, 'w') as stream:
+                stream.write('HPC_LOG_READER_TOKEN=' + secrets.token_hex(32) + '\n')
+            print('created')
+    creates: /etc/hpc-log-reader.env
+  register: elk_reader_token
+  changed_when: elk_reader_token.stdout | default('') == 'created'
+  no_log: true
+- name: Inspect the reader credential without following a link
+  ansible.builtin.stat:
+    path: /etc/hpc-log-reader.env
+    follow: false
+  register: elk_reader_file
+- name: Require a regular reader credential file
+  ansible.builtin.assert:
+    that: elk_reader_file.stat.isreg | default(false)
+- name: Protect the existing reader credential
+  ansible.builtin.file:
+    path: /etc/hpc-log-reader.env
+    owner: root
+    group: root
+    mode: '0600'
+    follow: false
+- name: Configure the isolated log query service
+  ansible.builtin.template:
+    src: log-reader.service.j2
+    dest: /etc/systemd/system/hpc-log-reader.service
+    mode: '0644'
+  notify: ELK restart log reader
+- name: Start only the loopback reader endpoint
+  ansible.builtin.systemd:
+    name: hpc-log-reader
+    state: started
+    enabled: true
+    daemon_reload: true

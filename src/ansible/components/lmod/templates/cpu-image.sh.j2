@@ -1,4 +1,9 @@
 install_packages {{ ('Lmod-' ~ lmod_rpm_release) | quote }} acl
+{% if 'elk' in core_components %}
+put_file /etc/hpc-lmod/SitePackage.lua 0644 root root <<'HPC_LMOD_HOOK'
+{% include 'SitePackage.lua.j2' %}{{ '\n' }}
+HPC_LMOD_HOOK
+{% endif %}
 test -r /usr/share/lmod/lmod/init/bash
 put_file /etc/profile.d/z10-hpc-lmod.sh 0644 root root <<'HPC_LMOD'
 {% include 'lmod.sh.j2' %}{{ '\n' }}

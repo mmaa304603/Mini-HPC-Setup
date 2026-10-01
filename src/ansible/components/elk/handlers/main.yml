@@ -1,15 +1,24 @@
 ---
-- name: restart elasticsearch
-  systemd:
-    name: elasticsearch
-    state: restarted
-
-- name: restart logstash
-  systemd:
+- name: ELK restart Elasticsearch
+  ansible.builtin.include_tasks: elasticsearch_service.yml
+  vars:
+    elk_elasticsearch_state: restarted
+- name: ELK restart Logstash
+  ansible.builtin.systemd:
     name: logstash
     state: restarted
-
-- name: restart kibana
-  systemd:
+    daemon_reload: true
+- name: ELK restart Kibana
+  ansible.builtin.systemd:
     name: kibana
-    state: restarted 
+    state: restarted
+    daemon_reload: true
+- name: ELK restart Filebeat
+  ansible.builtin.systemd:
+    name: filebeat
+    state: restarted
+- name: ELK restart log reader
+  ansible.builtin.systemd:
+    name: hpc-log-reader
+    state: restarted
+    daemon_reload: true

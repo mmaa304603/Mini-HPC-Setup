@@ -14,7 +14,7 @@ def digest(value):
 def role_content(directory):
     result = {}
     for folder in ('defaults', 'vars', 'tasks', 'handlers', 'templates', 'files',
-                   'action_plugins', 'filter_plugins', 'library', 'meta'):
+                   'action_plugins', 'callback_plugins', 'filter_plugins', 'library', 'meta'):
         for path in sorted((directory / folder).rglob('*')):
             if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
                 result[str(path.relative_to(directory))] = hashlib.sha256(path.read_bytes()).hexdigest()

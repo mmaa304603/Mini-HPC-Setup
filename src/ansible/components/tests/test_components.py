@@ -26,6 +26,7 @@ IMAGE_FUNCTIONS = (COMPONENTS / "warewulf/files/image-functions.sh").read_text()
 
 def fixture():
     return {
+        "elk_version": "9.5.4",
         "core_components": ["warewulf", "slurm", "spack"],
         "core_cluster": {
             "head": {"name": "head", "address": "10.0.0.1"},
@@ -88,7 +89,7 @@ class TemplateTests(unittest.TestCase):
         root = os.stat("/")
         for component, template in [("warewulf", "image-base.sh.j2"),
                                     ("slurm", "cpu-image.sh.j2"), ("spack", "cpu-image.sh.j2"),
-                                    ("lmod", "cpu-image.sh.j2")]:
+                                    ("lmod", "cpu-image.sh.j2"), ("elk", "cpu-image.sh.j2")]:
             with self.subTest(component=component):
                 script = IMAGE_FUNCTIONS + "\n" + render(component, template)
                 syntax = subprocess.run(["bash", "-n"], input=script, text=True, capture_output=True)
@@ -229,7 +230,8 @@ class EntryPointTests(unittest.TestCase):
                              "slurm": ["head", "cpu_image", "verify"],
                              "storage": ["preflight", "head", "cpu_image", "verify"],
                              "spack": ["head", "cpu_image", "verify"],
-                             "lmod": ["head", "cpu_image", "verify"]}.items():
+                             "lmod": ["head", "cpu_image", "verify"],
+                             "elk": ["preflight", "head", "cpu_image", "verify"]}.items():
             for phase in phases:
                 with self.subTest(role=role, phase=phase):
                     tasks = yaml.safe_load((COMPONENTS / role / "tasks" / f"{phase}.yml").read_text())
@@ -237,7 +239,7 @@ class EntryPointTests(unittest.TestCase):
 
     def test_image_exec_never_auto_builds_or_syncs_identities(self):
         count = 0
-        for role in ["warewulf", "slurm", "storage", "spack", "lmod"]:
+        for role in ["warewulf", "slurm", "storage", "spack", "lmod", "elk"]:
             for path in (COMPONENTS / role / "tasks").glob("*.yml"):
                 text = path.read_text()
                 for line in text.splitlines():
@@ -246,7 +248,7 @@ class EntryPointTests(unittest.TestCase):
                         self.assertIn("--build=false", line)
                         self.assertIn("--syncuser=false", line)
                         self.assertIn("HPC_HEAD_ROOT=", line)
-        self.assertEqual(count, 7)
+        self.assertEqual(count, 8)
 
 
 if __name__ == "__main__":

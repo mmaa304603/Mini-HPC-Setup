@@ -1,0 +1,14 @@
+---
+- name: Validate image execution context
+  ansible.builtin.include_role:
+    name: '{{ role_path }}/../warewulf'
+    tasks_from: image_context
+- name: Configure CPU log collection without starting services in the image
+  ansible.builtin.command:
+    argv: [wwctl, image, exec, '--build=false', '--syncuser=false', '{{ core_cluster.cpu_image }}', --, /usr/bin/env, 'HPC_HEAD_ROOT={{ hpc_head_root_identity }}', /bin/bash, -s]
+    stdin: |
+      {{ lookup('ansible.builtin.file', role_path ~ '/../warewulf/files/image-functions.sh') }}
+      {{ lookup('ansible.builtin.template', 'cpu-image.sh.j2') }}
+  register: elk_image_result
+  changed_when: "'HPC_CHANGED=1' in elk_image_result.stdout"
+  failed_when: elk_image_result.rc != 0 or elk_image_result.stdout is not search('(?m)^HPC_CHANGED=[01]$')

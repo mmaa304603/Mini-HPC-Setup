@@ -1,0 +1,32 @@
+---
+- name: Start Elasticsearch with application-level failure diagnostics
+  block:
+    - name: Apply the requested Elasticsearch service state
+      ansible.builtin.systemd:
+        name: elasticsearch
+        enabled: true
+        state: '{{ elk_elasticsearch_state }}'
+        daemon_reload: true
+  rescue:
+    - name: Read the Elasticsearch application error
+      ansible.builtin.command:
+        argv: [tail, -n, '100', /var/log/elasticsearch/hpc-logs.log]
+      register: elk_startup_log
+      changed_when: false
+      failed_when: false
+    - name: Read the Elasticsearch service journal
+      ansible.builtin.command:
+        argv: [journalctl, -u, elasticsearch, -n, '40', --no-pager]
+      register: elk_startup_journal
+      changed_when: false
+      failed_when: false
+    - name: Stop deployment with the Elasticsearch startup error
+      ansible.builtin.fail:
+        msg: |
+          Elasticsearch failed: {{ ansible_failed_result.msg | default('Service startup failed') }}
+          Application log:
+          {{ elk_startup_log.stdout | default('') }}
+          {{ elk_startup_log.stderr | default('') }}
+          Service journal:
+          {{ elk_startup_journal.stdout | default('') }}
+          {{ elk_startup_journal.stderr | default('') }}

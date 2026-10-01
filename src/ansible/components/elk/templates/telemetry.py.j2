@@ -1,0 +1,240 @@
+#!/usr/bin/python3
+"""Bounded local observability. No component command depends on ELK availability."""
+import argparse
+from collections import deque
+from datetime import datetime, timezone
+import fcntl
+import json
+import os
+from pathlib import Path
+import pwd
+import re
+import socket
+import subprocess
+import sys
+import time
+import uuid
+import urllib.request
+
+MAX_FILE = 8 * 1024 * 1024
+MAX_DETAIL = 256 * 1024
+SECRET = re.compile(r'(?i)((?:password|passwd|token|secret|api[_-]?key|authorization)\s*[=:]\s*)([^\s,;]+)')
+
+
+def clean(value):
+    value = SECRET.sub(r'\1[REDACTED]', str(value))
+    return re.sub(r'(https?://)[^/@\s]+:[^/@\s]+@', r'\1[REDACTED]@', value)
+
+
+def scrub(value):
+    if isinstance(value, dict):
+        return {str(k): ('[REDACTED]' if re.search(r'(?i)password|passwd|token|secret|authorization|api.?key', str(k)) else scrub(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [scrub(v) for v in value]
+    return clean(value) if isinstance(value, str) else value
+
+
+def record(dataset, action, outcome='unknown', message='', **details):
+    return {'@timestamp': datetime.now(timezone.utc).isoformat(),
+            'event': {'id': uuid.uuid4().hex, 'dataset': dataset, 'action': action, 'outcome': outcome},
+            'message': clean(message)[:8192], 'hpc': scrub(details),
+            'host': {'name': socket.gethostname()},
+            'user': {'id': str(os.getuid()), 'name': pwd.getpwuid(os.getuid()).pw_name}}
+
+
+def append(path, data):
+    """Single writer lock covers rotation and append; retain at most three 8 MiB files."""
+    path = Path(path)
+    with os.fdopen(os.open(str(path) + '.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600), 'w') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if path.exists() and path.stat().st_size >= MAX_FILE:
+            second = Path(str(path) + '.2')
+            second.unlink(missing_ok=True)
+            first = Path(str(path) + '.1')
+            if first.exists():
+                first.replace(second)
+            path.replace(first)
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o640)
+        with os.fdopen(fd, 'a') as stream:
+            stream.write(json.dumps(data, separators=(',', ':')) + '\n')
+
+
+def emit(path, *args, **kwargs):
+    try:
+        data = record(*args, **kwargs)
+        if path == 'journal':
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as channel:
+                channel.setblocking(False)
+                channel.connect('/dev/log')
+                channel.send(('<14>hpc-events: ' + json.dumps(data)).encode())
+        else:
+            append(path, data)
+    except (OSError, KeyError) as error:
+        # Fail open for component operations, but make local collection failure visible.
+        print('HPC telemetry write failed: ' + str(error), file=sys.stderr)
+
+
+def run_command(args):
+    command = args.command
+    if command and command[0] == '--':
+        command = command[1:]
+    operation = uuid.uuid4().hex
+    start = time.monotonic()
+    wall_start = time.time()
+    details = {'operation': {'id': operation}, 'deployment': {'id': args.deployment},
+               'package': {'spec': args.spec}, 'environment': args.environment, 'probe': {'id': args.probe}}
+    emit(args.output, 'hpc.spack', args.action + '-start', message='Spack operation started', **details)
+    # Bounded ring holds diagnostics even if the command writes gigabytes.
+    tail = deque(maxlen=MAX_DETAIL // 4096)
+    output_size = 0
+    try:
+        child = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        while True:
+            chunk = child.stdout.read1(4096)
+            if not chunk:
+                break
+            sys.stdout.buffer.write(chunk)
+            sys.stdout.buffer.flush()
+            tail.append(chunk)
+            output_size += len(chunk)
+        rc = child.wait()
+    except OSError as error:
+        tail.append(str(error).encode())
+        rc = 127
+    details['process'] = {'exit_code': rc}
+    details['duration_seconds'] = round(time.monotonic() - start, 3)
+    emit(args.output, 'hpc.spack', args.action + '-end', 'success' if rc == 0 else 'failure',
+         'Spack operation completed', **details)
+    if rc:
+        dump_detail(args.output, b''.join(tail), output_size, 'command-output', details)
+        # Only this run's logs, no symlinks and at most four build files, 256 KiB each.
+        found = 0
+        scan_started = time.monotonic()
+        scanned = 0
+        for directory, dirs, files in os.walk(args.stage, followlinks=False):
+            scanned += 1
+            if scanned > 2000 or time.monotonic() - scan_started > 5:
+                emit(args.output, 'hpc.spack.build', 'capture-limit', 'unknown',
+                     'Build-log discovery budget reached; additional files may exist', **details)
+                break
+            dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(directory, d))]
+            if 'spack-build-out.txt' not in files:
+                continue
+            path = Path(directory) / 'spack-build-out.txt'
+            try:
+                fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                with os.fdopen(fd, 'rb') as stream:
+                    info = os.fstat(stream.fileno())
+                    import stat
+                    if not stat.S_ISREG(info.st_mode) or info.st_mtime < wall_start:
+                        continue
+                    stream.seek(max(0, info.st_size - MAX_DETAIL))
+                    dump_detail(args.output, stream.read(MAX_DETAIL), info.st_size, str(path), details)
+                    found += 1
+            except OSError:
+                continue
+            if found >= 4:
+                emit(args.output, 'hpc.spack.build', 'capture-limit', 'unknown',
+                     'Build-log capture limited to four files; additional files may exist', **details)
+                break
+    return rc if rc >= 0 else 128 - rc
+
+
+def dump_detail(output, content, original_size, source, details):
+    # Redact before splitting so a credential cannot straddle emitted chunks.
+    text = clean(content.decode('utf-8', 'replace'))
+    for offset in range(0, len(text), 4096):
+        emit(output, 'hpc.spack.build', 'diagnostic', 'failure', text[offset:offset + 4096],
+             **details, diagnostic={'source': source, 'offset': offset,
+                                    'truncated': original_size > len(content), 'original_bytes': original_size})
+
+
+def command_result(argv):
+    try:
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=8)
+        return {'exit_code': result.returncode, 'output': clean(result.stdout)[:16384],
+                'error': clean(result.stderr)[:2048], 'truncated': len(result.stdout) > 16384}
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {'exit_code': -1, 'error': str(error)}
+
+
+def snapshot(config, output):
+    node = config.get('node') or socket.gethostname().split('.')[0]
+    services = {name: command_result(['systemctl', 'is-active', name]) for name in config['services']}
+    memory = {}
+    for line in Path('/proc/meminfo').read_text().splitlines():
+        name, value = line.split(':', 1)
+        if name in ['MemTotal', 'MemAvailable', 'SwapTotal', 'SwapFree']:
+            memory[name] = int(value.strip().split()[0]) * 1024
+    fs = os.statvfs('/')
+    network = Path('/proc/net/dev').read_text()[:8192]
+    emit(output, 'hpc.health', 'heartbeat', 'success' if all(s['exit_code'] == 0 for s in services.values()) else 'failure', 'Periodic node observation',
+         node={'name': node, 'boot_id': Path('/proc/sys/kernel/random/boot_id').read_text().strip()}, probe={'id': os.environ.get('HPC_LOG_PROBE', '')}, services=services, memory=memory,
+         cpu={'load_average': list(os.getloadavg()), 'count': os.cpu_count(),
+              'ticks': Path('/proc/stat').read_text().splitlines()[0]},
+         disk={'path': '/', 'available_bytes': fs.f_bavail * fs.f_frsize,
+               'total_bytes': fs.f_blocks * fs.f_frsize}, network={'counters': network})
+    diag = command_result(['journalctl', '-u', 'filebeat', '-n', '5', '--no-pager', '-o', 'cat'])
+    emit(output, 'hpc.collector', 'diagnostics', 'unknown', diag.get('output', ''),
+         node={'name': node}, observation=diag)
+    if config['head']:
+        for name, argv in config.get('commands', {}).items():
+            result = command_result(argv)
+            emit(output, 'hpc.state', name, 'success' if result['exit_code'] == 0 else 'failure',
+                 result.get('output', ''), node={'name': node}, observation=result)
+        # Independent of a quiet service: require a recent heartbeat from every expected node.
+        for expected in config['nodes']:
+            query = {'query': {'bool': {'filter': [
+                {'term': {'event.dataset.keyword': 'hpc.health'}},
+                {'term': {'hpc.node.name.keyword': expected}},
+                {'range': {'@timestamp': {'gte': 'now-3m'}}}]}}}
+            try:
+                request = urllib.request.Request('http://127.0.0.1:9200/hpc-logs-*/_count',
+                    data=json.dumps({'query': query['query']}).encode(), headers={'Content-Type': 'application/json'})
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(request, timeout=5) as response:
+                    healthy = json.load(response)['count'] > 0
+                error = ''
+            except (OSError, ValueError, KeyError) as exc:
+                healthy, error = False, str(exc)
+            emit(output, 'hpc.collection', 'freshness', 'success' if healthy else 'failure',
+                 'Heartbeat received' if healthy else 'Heartbeat missing or query unavailable',
+                 node={'name': expected}, freshness={'window_seconds': 180, 'error': error})
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', default='/var/log/hpc-telemetry/events.jsonl')
+    sub = parser.add_subparsers(dest='mode', required=True)
+    run = sub.add_parser('run')
+    run.add_argument('--action', required=True)
+    run.add_argument('--probe', default='')
+    run.add_argument('--spec', default='')
+    run.add_argument('--environment', default='')
+    run.add_argument('--deployment', default='')
+    run.add_argument('--stage', default='/var/tmp/hpc-spack-stage')
+    run.add_argument('command', nargs=argparse.REMAINDER)
+    archive = sub.add_parser('archive')
+    archive.add_argument('source')
+    snap = sub.add_parser('snapshot')
+    snap.add_argument('--config', default='/etc/hpc-telemetry.json')
+    probe = sub.add_parser('probe')
+    probe.add_argument('token')
+    args = parser.parse_args()
+    if args.mode == 'run':
+        return run_command(args)
+    if args.mode == 'archive':
+        with open(args.source) as source:
+            for line in source:
+                append(args.output, json.loads(line))
+        os.unlink(args.source)
+        return 0
+    if args.mode == 'snapshot':
+        return snapshot(json.loads(Path(args.config).read_text()), args.output)
+    emit(args.output, 'hpc.probe', 'file-probe', 'success', args.token, probe={'id': args.token})
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

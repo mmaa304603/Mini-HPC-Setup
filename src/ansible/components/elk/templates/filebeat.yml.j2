@@ -1,0 +1,76 @@
+# CPU registry/queues are local to the stateless OS; see README for loss bounds.
+filebeat.inputs:
+  - type: journald
+    id: hpc-journal
+    seek: since
+    since: -1h
+    fields:
+      event:
+        dataset: hpc.journal
+    fields_under_root: true
+    processors:
+      # Collector faults are sampled by hpc-telemetry; do not feed its own errors back.
+      - drop_event:
+          when.equals.systemd.unit: filebeat.service
+      - decode_json_fields:
+          fields: [message]
+          target: hpc_payload
+          max_depth: 5
+          when.or:
+            - equals: {log.syslog.appname: hpc-lmod}
+            - equals: {log.syslog.appname: hpc-events}
+  - type: filestream
+    id: hpc-events
+    paths:
+      - /var/log/hpc-telemetry/*.jsonl
+      - /var/log/hpc-telemetry/*.jsonl.[12]
+      - /var/log/hpc-telemetry/spack/*.jsonl
+      - /var/log/hpc-telemetry/spack/*.jsonl.[12]
+    prospector.scanner.fingerprint.length: 64
+    parsers:
+      - ndjson:
+          target: hpc_payload
+          add_error_key: true
+{% if 'slurm' in core_components %}
+  - type: filestream
+    id: hpc-slurm
+    paths: [/var/log/slurm/*.log]
+    prospector.scanner.fingerprint.length: 64
+    fields:
+      event:
+        dataset: hpc.slurm
+    fields_under_root: true
+{% endif %}
+  - type: filestream
+    id: hpc-service-files
+    paths:
+      - /var/log/munge/munged.log
+{% if not (elk_image | default(false)) %}
+      - /var/log/elasticsearch/*.log
+      - /var/log/elasticsearch/*_server.json
+      - /var/log/logstash/logstash-plain.log
+{% endif %}
+    prospector.scanner.fingerprint.length: 64
+    fields:
+      event:
+        dataset: hpc.service
+    fields_under_root: true
+    parsers:
+      - multiline:
+          type: pattern
+          pattern: '^[[:space:]]|^Caused by:'
+          negate: false
+          match: after
+          max_lines: 100
+          timeout: 5s
+output.logstash:
+  hosts: ["{{ core_cluster.head.address }}:5044"]
+# Bounded on-disk backlog. On stateless CPUs this still disappears on reboot.
+queue.disk:
+  max_size: 128MB
+  segment_size: 16MB
+logging.level: warning
+setup.ilm.enabled: false
+setup.template.enabled: false
+processors:
+  - add_host_metadata: ~

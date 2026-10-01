@@ -11,6 +11,10 @@ StateSaveLocation=/var/spool/slurm/state
 SlurmdSpoolDir=/var/spool/slurm/d
 SlurmctldLogFile=/var/log/slurm/slurmctld.log
 SlurmdLogFile=/var/log/slurm/slurmd.log
+{% if 'elk' in core_components %}
+JobCompType=jobcomp/filetxt
+JobCompLoc=/var/log/slurm/job-completion.log
+{% endif %}
 SchedulerType=sched/backfill
 SelectType=select/cons_tres
 SelectTypeParameters=CR_Core_Memory

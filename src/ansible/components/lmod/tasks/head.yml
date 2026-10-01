@@ -29,6 +29,18 @@
 - name: Require the supported Lmod package layout
   ansible.builtin.assert:
     that: lmod_init.stat.exists
+- name: Create the managed Lmod hook directory
+  ansible.builtin.file:
+    path: /etc/hpc-lmod
+    state: directory
+    mode: '0755'
+  when: "'elk' in core_components"
+- name: Install nonblocking Lmod usage hooks
+  ansible.builtin.template:
+    src: SitePackage.lua.j2
+    dest: /etc/hpc-lmod/SitePackage.lua
+    mode: '0644'
+  when: "'elk' in core_components"
 - name: Initialize the shared modules for Bash users
   ansible.builtin.template:
     src: lmod.sh.j2

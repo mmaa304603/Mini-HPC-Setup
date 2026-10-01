@@ -13,6 +13,13 @@
         tasks_from: security
         public: false
 
+    - name: Prepare local observability before component operations
+      ansible.builtin.include_role:
+        name: "{{ core_components_dir }}/elk"
+        tasks_from: bootstrap
+        public: false
+      when: "'elk' in core_components"
+
     - name: Prepare deployment checkpoints after successful preflight
       ansible.builtin.include_tasks: checkpoints.yml
       when: core_checkpoint_enabled | bool
@@ -31,6 +38,12 @@
         public: false
       when: core_stage == 'full'
   always:
+    - name: Preserve bounded deployment diagnostics
+      ansible.builtin.include_tasks: deployment_logs.yml
+      when:
+        - "'elk' in core_components"
+        - lookup('ansible.builtin.env', 'HPC_EVENT_SPOOL') | length > 0
+
     - name: Release only this deployment's lock
       hpc_core_lock:
         directory: "{{ core_lock_dir }}"

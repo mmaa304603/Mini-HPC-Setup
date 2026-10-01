@@ -54,6 +54,13 @@
     create_home: true
     home: /var/lib/hpc-spack
     shell: /sbin/nologin
+- name: Create a builder-owned bounded telemetry spool
+  ansible.builtin.file:
+    path: /var/log/hpc-telemetry/spack
+    state: directory
+    owner: '{{ spack_build_user }}'
+    mode: '0750'
+  when: "'elk' in core_components"
 - name: Create only the dedicated software and cache directories
   ansible.builtin.file:
     path: "{{ item }}"
@@ -135,7 +142,7 @@
   become: true
   become_user: "{{ spack_build_user }}"
   ansible.builtin.command:
-    argv: ["{{ spack_install_dir }}/bin/spack", -e, "{{ spack_environment_dir }}", concretize]
+    argv: "{{ (['/usr/local/libexec/hpc-telemetry', '--output', '/var/log/hpc-telemetry/spack/events.jsonl', 'run', '--action', 'concretize', '--environment', spack_environment_dir, '--spec', spack_packages | join(' '), '--deployment', lookup('ansible.builtin.env', 'HPC_EVENT_RUN_ID'), '--'] if 'elk' in core_components else []) + [spack_install_dir ~ '/bin/spack', '-e', spack_environment_dir, 'concretize'] }}"
   environment: "{{ spack_command_environment }}"
   changed_when: false
 - name: Detect changes to the concretized environment
@@ -158,7 +165,7 @@
     exec </dev/null
     umask 022
     before="$({{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} find --format '{hash}')"
-    {{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} install --fail-fast
+    {% if 'elk' in core_components %}/usr/local/libexec/hpc-telemetry --output /var/log/hpc-telemetry/spack/events.jsonl run --action install --environment {{ spack_environment_dir | quote }} --spec {{ (spack_packages | join(' ')) | quote }} --deployment {{ lookup('ansible.builtin.env', 'HPC_EVENT_RUN_ID') | quote }} -- {% endif %}{{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} install --fail-fast
     after="$({{ (spack_install_dir ~ '/bin/spack') | quote }} -e {{ spack_environment_dir | quote }} find --format '{hash}')"
     if [[ "$before" != "$after" ]]; then echo HPC_SPACK_CHANGED; fi
   args:
@@ -180,3 +187,11 @@
     dest: /etc/profile.d/hpc-spack.sh
     mode: '0644'
     validate: /bin/bash -n %s
+
+- name: Install an explicitly logged entry point for manual Spack operations
+  ansible.builtin.template:
+    src: hpc-spack.sh.j2
+    dest: /usr/local/bin/hpc-spack
+    mode: '0755'
+    validate: /bin/bash -n %s
+  when: "'elk' in core_components"

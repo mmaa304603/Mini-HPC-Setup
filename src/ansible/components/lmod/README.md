@@ -100,3 +100,10 @@ See [local tests](../tests/README.md).
 References: [Spack 0.23.1 modules](https://spack.readthedocs.io/en/v0.23.1/module_file_support.html),
 [EPEL Lmod package](https://packages.fedoraproject.org/pkgs/Lmod/Lmod/epel-9.html),
 [Lmod initialization](https://lmod.readthedocs.io/en/latest/030_installing.html).
+
+## Optional ELK observability
+
+When `elk` is selected, core also enables this component's managed telemetry.
+See [ELK collection and verification](../elk/OBSERVABILITY.md) for sources,
+retention, test commands and coverage limits. Normal component operations do not
+wait for Elasticsearch.

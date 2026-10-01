@@ -29,6 +29,7 @@ class OrchestrationTests(unittest.TestCase):
         shutil.copytree(CORE / "roles/hpc_core", self.role)
         self.components = self.root / "components"
         self.write(self.components / 'warewulf/tasks/security.yml', [])
+        self.write(self.components / 'elk/tasks/bootstrap.yml', [])
         self.write(self.components / 'warewulf/tasks/verify_publication.yml', [])
         self.catalog = yaml.safe_load((self.role / "vars/main.yml").read_text())
         for phase in self.catalog["core_deploy_phases"] + self.catalog["core_verify_phases"]:
@@ -115,6 +116,34 @@ class OrchestrationTests(unittest.TestCase):
             stderr=subprocess.STDOUT, timeout=60)
         return result
 
+    def test_failed_deployment_archives_callback_events_and_releases_lock(self):
+        log_dir = self.root / 'telemetry'
+        log_dir.mkdir()
+        helper = self.root / 'hpc-telemetry'
+        helper.write_text((ANSIBLE / 'components/elk/templates/telemetry.py.j2').read_text())
+        helper.chmod(0o755)
+        logs = self.role / 'tasks/deployment_logs.yml'
+        text = logs.read_text().replace('/var/log/hpc-telemetry', str(log_dir)).replace('/usr/local/libexec/hpc-telemetry', str(helper))
+        tasks = yaml.safe_load(text)
+        copy = tasks[0]['block'][0]['ansible.builtin.copy']
+        copy.pop('owner'); copy.pop('group')
+        self.write(logs, tasks)
+        with self.config.open('a') as stream:
+            stream.write('callback_plugins = ' + str(self.role / 'callback_plugins') + '\ncallbacks_enabled = hpc_events\n')
+        self.write(self.components / 'spack/tasks/head.yml', [
+            {'name': 'Private successful operation', 'ansible.builtin.debug': {'msg': 'PRIVATE_VALUE_123'}, 'no_log': True},
+            {'name': 'Controlled build failure', 'ansible.builtin.fail': {'msg': 'build failed token=TOPSECRET'}},
+        ])
+        result = self.run_play()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.root / 'deploy-lock').exists(), result.stdout)
+        saved = (log_dir / 'deployment.jsonl').read_text()
+        self.assertIn('Controlled build failure', saved)
+        self.assertIn('[REDACTED]', saved)
+        self.assertNotIn('TOPSECRET', saved)
+        self.assertNotIn('PRIVATE_VALUE_123', saved)
+        self.assertNotIn('Private successful operation', saved)
+
     def test_deploy_orders_phases_and_flushes_handlers_without_contacting_compute(self):
         result = self.run_play()
         self.assertEqual(result.returncode, 0, result.stdout)
@@ -177,6 +206,28 @@ class OrchestrationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertIn('DEDICATED_DATA_DISK_REQUIRED', result.stdout)
         self.assertNotIn('PHASE_RAN::', result.stdout)
+        self.assertFalse((self.root / 'deploy-lock').exists())
+
+    def test_elk_admission_failure_stops_before_lock_and_installers(self):
+        tasks = yaml.safe_load((self.role / 'tasks/preflight.yml').read_text())
+        tasks.append(next(t for t in self.preflight
+                          if t['name'] == 'Validate ELK capacity and existing installation before any changes'))
+        self.write(self.role / 'tasks/preflight.yml', tasks)
+        self.write(self.components / 'elk/tasks/preflight.yml', [
+            {'ansible.builtin.fail': {'msg': 'ELK_CAPACITY_REQUIRED'}}])
+        result = self.run_play('-e', 'core_resume=true', '-e', 'core_checkpoint_enabled=true')
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('ELK_CAPACITY_REQUIRED', result.stdout)
+        self.assertNotIn('PHASE_RAN::', result.stdout)
+        self.assertFalse((self.root / 'deploy-lock').exists())
+
+    def test_elk_failure_prevents_image_publication(self):
+        self.write(self.components / 'elk/tasks/head.yml', [
+            {'ansible.builtin.fail': {'msg': 'ELK_NOT_READY'}}])
+        result = self.run_play()
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn('ELK_NOT_READY', result.stdout)
+        self.assertNotIn('PHASE_RAN::warewulf/publish', result.stdout)
         self.assertFalse((self.root / 'deploy-lock').exists())
 
     def test_preparation_runs_only_two_phases_and_flushes_handlers(self):

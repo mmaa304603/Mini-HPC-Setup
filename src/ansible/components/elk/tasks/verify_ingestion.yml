@@ -1,0 +1,25 @@
+---
+- name: Generate a unique end-to-end log probe
+  ansible.builtin.set_fact:
+    elk_probe: "hpc-elk-{{ lookup('ansible.builtin.pipe', 'python3 -c \"import uuid; print(uuid.uuid4().hex)\"') }}"
+- name: Emit a test message through each machine's journal
+  ansible.builtin.command:
+    argv: [logger, -t, hpc-elk-verify, --, '{{ elk_probe }}-{{ item }}']
+  delegate_to: '{{ item }}'
+  loop: '{{ elk_test_hosts }}'
+  changed_when: false
+- name: Require each test event to arrive through Filebeat and Logstash
+  ansible.builtin.uri:
+    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    method: POST
+    body_format: json
+    body:
+      query:
+        match_phrase:
+          message: '{{ elk_probe }}-{{ item }}'
+    use_proxy: false
+  register: elk_event
+  until: elk_event.status == 200 and (elk_event.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 5
+  loop: '{{ elk_test_hosts }}'

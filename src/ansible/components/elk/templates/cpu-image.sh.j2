@@ -1,0 +1,26 @@
+put_file /etc/yum.repos.d/hpc-elastic.repo 0644 root root <<'HPC_ELASTIC_REPO'
+{% include 'elastic.repo.j2' %}{{ '\n' }}
+HPC_ELASTIC_REPO
+{% set elk_image = true %}
+install_packages python3
+install_packages --enablerepo=hpc-elastic {{ ('filebeat-' ~ elk_version) | quote }}
+put_file /etc/filebeat/filebeat.yml 0600 root root <<'HPC_FILEBEAT'
+{% include 'filebeat.yml.j2' %}{{ '\n' }}
+HPC_FILEBEAT
+ensure_dir /var/log/hpc-telemetry 0755 root root
+put_file /usr/local/libexec/hpc-telemetry 0755 root root <<'HPC_TELEMETRY_SCRIPT'
+{% include 'telemetry.py.j2' %}{{ '\n' }}
+HPC_TELEMETRY_SCRIPT
+put_file /etc/hpc-telemetry.json 0644 root root <<'HPC_TELEMETRY_CONFIG'
+{% include 'telemetry.json.j2' %}{{ '\n' }}
+HPC_TELEMETRY_CONFIG
+put_file /etc/systemd/system/hpc-telemetry.service 0644 root root <<'HPC_TELEMETRY_SERVICE'
+{% include 'telemetry.service.j2' %}{{ '\n' }}
+HPC_TELEMETRY_SERVICE
+put_file /etc/systemd/system/hpc-telemetry.timer 0644 root root <<'HPC_TELEMETRY_TIMER'
+{% include 'telemetry.timer.j2' %}{{ '\n' }}
+HPC_TELEMETRY_TIMER
+enable_service hpc-telemetry.timer
+filebeat test config -c /etc/filebeat/filebeat.yml -e
+enable_service filebeat
+echo "HPC_CHANGED=$hpc_changed"

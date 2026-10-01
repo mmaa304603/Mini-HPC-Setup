@@ -14,4 +14,11 @@
   <port protocol="tcp" port="{{ slurm_controller_port | default(6817) }}"/>
   <port protocol="tcp" port="{{ slurm_srun_ports | default('60001-63000') }}"/>
 {% endif %}
+{% if 'elk' in core_components %}
+  <rule family="ipv4">
+    <source address="{{ core_cluster.network.cidr }}"/>
+    <port protocol="tcp" port="5044"/>
+    <accept/>
+  </rule>
+{% endif %}
 </zone>
