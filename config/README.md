@@ -15,6 +15,10 @@ one preinstalled GPU node. Verify the CPU PXE NIC MACs, usable Slurm memory,
 CPU topology and SSH connection settings before deployment. CPU memory is
 7000 MB per node, matching `SLURM_DEFAULT_MEM` in the shell Slurm configuration;
 override it per host if hardware differs.
+CPU verification connects as root and uses `su` to run checks as storage users
+or service accounts. Its `-s /bin/sh` flag supports accounts with a nologin shell;
+the minimal CPU image does not need sudo. These connection settings are scoped
+to `cpu_nodes` in `hosts.yml`; the head and GPU retain their own settings.
 The CPU core workflow configures CPUs only. The separate
 [GPU entrypoint](../src/ansible/components/jetson/README.md) initializes the
 preinstalled Jetson over SSH. Set its normal `ansible_user` in `gpu_nodes.yml`
