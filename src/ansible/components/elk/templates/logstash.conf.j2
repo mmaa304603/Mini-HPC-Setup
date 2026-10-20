@@ -16,6 +16,10 @@ filter {
           "[hpc_payload][hpc]" => "[hpc]"
           "[hpc_payload][user]" => "[user]"
           "[hpc_payload][message]" => "[message]"
+          "[hpc_payload][service]" => "[service]"
+          "[hpc_payload][trace]" => "[trace]"
+          "[hpc_payload][span]" => "[span]"
+          "[hpc_payload][log][level]" => "[log][level]"
         }
       }
       if [hpc_payload][@timestamp] {
@@ -33,9 +37,13 @@ filter {
       include_keys => ["JobId", "UserId", "GroupId", "Name", "JobState", "ExitCode", "NodeList", "StartTime", "EndTime", "Partition"]
     }
   }
-  mutate { replace => { "[@metadata][hpc_index]" => "hpc-logs" } }
+  ruby {
+    path => "/etc/logstash/hpc-normalize.rb"
+    script_params => { "cluster_id" => "{{ elk_cluster_id | default('mini-hpc') }}" }
+  }
+  mutate { replace => { "[@metadata][hpc_index]" => "hpc-logs-v1" } }
   if [event][dataset] == "hpc.spack.build" {
-    mutate { replace => { "[@metadata][hpc_index]" => "hpc-logs-build" } }
+    mutate { replace => { "[@metadata][hpc_index]" => "hpc-logs-build-v1" } }
   }
   # An explicit ingestion clock lets readers measure delivery lag and detect replay.
   ruby { code => 'event.set("[event][ingested]", LogStash::Timestamp.now)' }
@@ -44,6 +52,7 @@ output {
   elasticsearch {
     hosts => ["http://127.0.0.1:9200"]
     index => "%{[@metadata][hpc_index]}"
+    document_id => "%{[event][id]}"
     data_stream => false
     ilm_enabled => false
     manage_template => false

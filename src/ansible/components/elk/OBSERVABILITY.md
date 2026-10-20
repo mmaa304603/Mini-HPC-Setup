@@ -1,5 +1,10 @@
 # Component logs and observations
 
+New writes use [schema v1](SCHEMA.md): `hpc-logs-v1` and
+`hpc-logs-build-v1` aliases, explicit field types, normalized job/service
+metadata and evidence IDs. Use the **hpc-telemetry-v1** Kibana data view.
+Older indexes are preserved; broker queries support both field generations.
+
 The collector runs locally; component commands never call Elasticsearch. Filebeat
 ships the journal and explicit file inputs to Logstash. Logstash records
 `event.ingested`, preserves producer timestamps, and promotes the allowed event

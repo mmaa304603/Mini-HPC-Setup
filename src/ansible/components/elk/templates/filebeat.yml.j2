@@ -74,3 +74,5 @@ setup.ilm.enabled: false
 setup.template.enabled: false
 processors:
   - add_host_metadata: ~
+  # Persisted with the queued event: retries retain the same source identity.
+  - add_id: ~

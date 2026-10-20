@@ -19,7 +19,7 @@
   changed_when: false
 - name: Require the file probe and fresh health observation from this host
   ansible.builtin.uri:
-    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    url: http://127.0.0.1:9200/hpc-logs-v1-*/_count
     method: POST
     body_format: json
     body:
@@ -27,8 +27,8 @@
         bool:
           filter:
             - term: {host.name: '{{ elk_source_hostname.stdout }}'}
-            - term: {event.dataset.keyword: '{{ item }}'}
-            - term: {hpc.probe.id.keyword: '{{ elk_probe }}'}
+            - term: {event.dataset: '{{ item }}'}
+            - term: {hpc.probe.id: '{{ elk_probe }}'}
     use_proxy: false
   loop: [hpc.probe, hpc.health]
   register: elk_source_event
@@ -52,7 +52,7 @@
   when: "'lmod' in core_components"
 - name: Require both Lmod actions with this probe and host
   ansible.builtin.uri:
-    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    url: http://127.0.0.1:9200/hpc-logs-v1-*/_count
     method: POST
     body_format: json
     body:
@@ -60,9 +60,9 @@
         bool:
           filter:
             - term: {host.name: '{{ elk_source_hostname.stdout }}'}
-            - term: {event.dataset.keyword: hpc.lmod}
-            - term: {event.action.keyword: '{{ item }}'}
-            - term: {hpc.probe.id.keyword: '{{ elk_probe }}'}
+            - term: {event.dataset: hpc.lmod}
+            - term: {event.action: '{{ item }}'}
+            - term: {hpc.probe.id: '{{ elk_probe }}'}
     use_proxy: false
   loop: [load, unload]
   register: elk_lmod_event

@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import tempfile
 import uuid
 from ansible.plugins.callback import CallbackBase
@@ -35,7 +36,7 @@ class CallbackModule(CallbackBase):
         os.environ['HPC_EVENT_SPOOL'] = name
         os.environ['HPC_EVENT_RUN_ID'] = self.run_id
 
-    def write(self, task, outcome, host='', result=None):
+    def write(self, task, outcome, host='', result=None, status=None):
         if not getattr(self, 'spool', None):
             return
         result = result or {}
@@ -46,14 +47,16 @@ class CallbackModule(CallbackBase):
             text = re.sub(r'(?i)((?:password|token|secret|api[_-]?key|authorization)\s*[=:]\s*)[^\s,;]+',
                           r'\1[REDACTED]', str(text))
             return re.sub(r'(https?://)[^/@\s]+:[^/@\s]+@', r'\1[REDACTED]@', text)[:4096]
-        details = {'deployment': {'id': self.run_id},
+        details = {'schema': {'version': '1.0.0'}, 'source': {'host': socket.gethostname()},
+                   'deployment': {'id': self.run_id},
                    'task': {'name': clean(task.get_name()), 'id': str(task._uuid),
-                            'action': task.action, 'target': host},
+                            'action': task.action, 'target': host,
+                            'status': status or {'success': 'ok', 'failure': 'failed'}.get(outcome, 'started')},
                    'changed': bool(result.get('changed', False))}
         if outcome == 'failure':
             details['diagnostic'] = {k: clean(result[k]) for k in ['msg', 'stderr', 'stdout', 'rc'] if k in result}
         entry = {'@timestamp': datetime.now(timezone.utc).isoformat(),
-                 'event': {'dataset': 'hpc.deployment', 'action': 'task', 'outcome': outcome},
+                 'event': {'id': uuid.uuid4().hex, 'dataset': 'hpc.deployment', 'action': 'task', 'outcome': outcome},
                  'message': clean(task.get_name()), 'hpc': details}
         try:
             if self.spool.stat().st_size > 2 * 1024 * 1024:
@@ -71,16 +74,17 @@ class CallbackModule(CallbackBase):
         self.write(task, 'unknown')
 
     def v2_runner_on_ok(self, result):
-        self.write(result._task, 'success', result._host.get_name(), result._result)
+        self.write(result._task, 'success', result._host.get_name(), result._result,
+                   status='changed' if result._result.get('changed') else 'ok')
 
     def v2_runner_on_failed(self, result, ignore_errors=False):
         self.write(result._task, 'failure', result._host.get_name(), result._result)
 
     def v2_runner_on_unreachable(self, result):
-        self.write(result._task, 'failure', result._host.get_name(), result._result)
+        self.write(result._task, 'failure', result._host.get_name(), result._result, status='unreachable')
 
     def v2_runner_on_skipped(self, result):
-        self.write(result._task, 'unknown', result._host.get_name(), {'msg': 'skipped'})
+        self.write(result._task, 'unknown', result._host.get_name(), result._result, status='skipped')
 
     def v2_playbook_on_stats(self, stats):
         # Core copies the spool under its deployment lock, including rescued failures.

@@ -67,6 +67,25 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(query['query']['bool']['filter'][-1],
                          {'match_phrase': {'message': '"},"script":{"source":"evil"}'}})
 
+    def test_schema_keywords_and_legacy_fields_are_both_searchable(self):
+        query = READER.query_body({'dataset': 'hpc.health', 'outcome': 'failure'})
+        for field, value, clause in zip(
+                ['event.dataset', 'event.outcome'], ['hpc.health', 'failure'],
+                query['query']['bool']['filter'][1:]):
+            self.assertEqual(clause, {'bool': {'minimum_should_match': 1, 'should': [
+                {'term': {field: value}}, {'term': {field + '.keyword': value}}]}})
+        self.assertTrue({'service', 'trace', 'span'} <= set(query['_source']))
+
+    def test_evidence_uses_backend_identity_even_when_source_claims_another(self):
+        hit = {'_index': 'hpc-logs-v1-000001', '_id': 'physical-id',
+               '_source': {'event': {'id': 'logical-id'}, '_id': 'forged'}}
+        reference = READER.evidence_reference(hit)
+        self.assertEqual(reference['id'], 'es:hpc-logs-v1-000001:physical-id')
+        self.assertEqual(reference['event_id'], 'logical-id')
+        legacy = READER.evidence_reference({'_index': 'old', '_id': '123', '_source': {}})
+        self.assertEqual(legacy['id'], 'es:old:123')
+        self.assertIsNone(legacy['event_id'])
+
 
 if __name__ == '__main__':
     unittest.main()

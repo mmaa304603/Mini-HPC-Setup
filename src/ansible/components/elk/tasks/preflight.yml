@@ -10,6 +10,7 @@
       - elk_pipeline_workers | int <= 4
       - elk_retention_days | int >= 1
       - elk_rollover_size is match('^[1-9][0-9]*(mb|gb)$')
+      - elk_cluster_id is match('^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$')
     fail_msg: Review the ELK version, memory and retention settings in config/group_vars/all.yml.
 
 - name: Read head memory capacity

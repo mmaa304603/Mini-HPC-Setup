@@ -10,13 +10,17 @@
   changed_when: false
 - name: Require each test event to arrive through Filebeat and Logstash
   ansible.builtin.uri:
-    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    url: http://127.0.0.1:9200/hpc-logs-v1-*/_count
     method: POST
     body_format: json
     body:
       query:
-        match_phrase:
-          message: '{{ elk_probe }}-{{ item }}'
+        bool:
+          filter:
+            - match_phrase: {message: '{{ elk_probe }}-{{ item }}'}
+            - term: {hpc.schema.version: '1.0.0'}
+            - term: {hpc.cluster.id: '{{ elk_cluster_id }}'}
+            - exists: {field: event.id}
     use_proxy: false
   register: elk_event
   until: elk_event.status == 200 and (elk_event.json.count | default(0) | int) > 0

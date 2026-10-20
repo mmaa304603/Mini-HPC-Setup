@@ -26,6 +26,35 @@ spec.loader.exec_module(CALLBACK)
 
 
 class TelemetryTests(unittest.TestCase):
+    def test_managed_events_have_source_ids_schema_and_nanosecond_duration(self):
+        first = TELEMETRY.record('hpc.spack', 'install-end', duration_seconds=1.125)
+        second = TELEMETRY.record('hpc.spack', 'install-end', duration_seconds=1.125)
+        self.assertNotEqual(first['event']['id'], second['event']['id'])
+        self.assertEqual(first['hpc']['schema']['version'], '1.0.0')
+        self.assertEqual(first['event']['duration'], 1125000000)
+
+    def test_callback_distinguishes_status_and_respects_no_log_for_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            callback = CALLBACK.CallbackModule()
+            callback.spool = Path(directory) / 'events.jsonl'
+            callback.spool.touch()
+            callback.run_id = 'run'
+            task = SimpleNamespace(no_log=False, action='command', _uuid='task',
+                                   get_name=lambda: 'test task')
+            result = SimpleNamespace(_task=task, _host=SimpleNamespace(get_name=lambda: 'cpu01'),
+                                     _result={'changed': True})
+            callback.v2_runner_on_ok(result)
+            callback.v2_runner_on_unreachable(result)
+            callback.v2_runner_on_skipped(result)
+            result._result = {'_ansible_no_log': True}
+            callback.v2_runner_on_skipped(result)
+            rows = [json.loads(line) for line in callback.spool.read_text().splitlines()]
+            self.assertEqual([r['hpc']['task']['status'] for r in rows],
+                             ['changed', 'unreachable', 'skipped'])
+            self.assertEqual([r['event']['outcome'] for r in rows], ['success', 'failure', 'unknown'])
+            self.assertEqual(len({r['event']['id'] for r in rows}), 3)
+            self.assertTrue(all(r['hpc']['task']['target'] == 'cpu01' for r in rows))
+
     def test_command_exit_and_bounded_failure_capture_with_redaction(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

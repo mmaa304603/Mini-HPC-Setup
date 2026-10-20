@@ -7,6 +7,8 @@ elk_kibana_heap_mb: 2048
 elk_pipeline_workers: 1
 elk_retention_days: 7
 elk_rollover_size: 1gb
+# Stable identity for this installation; override when managing multiple clusters.
+elk_cluster_id: mini-hpc
 # Admission thresholds; the defaults leave room for the existing head services.
 elk_min_memory_mb: 7168
 elk_min_free_bytes: 10737418240

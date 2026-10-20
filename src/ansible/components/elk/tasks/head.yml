@@ -85,8 +85,8 @@
     elk_index_retention: '{{ elk_index.days }}'
     elk_index_rollover: '{{ elk_index.size }}'
   loop:
-    - {name: hpc-logs, days: '{{ elk_retention_days }}', size: '{{ elk_rollover_size }}'}
-    - {name: hpc-logs-build, days: 2, size: 128mb}
+    - {name: hpc-logs-v1, days: '{{ elk_retention_days }}', size: '{{ elk_rollover_size }}'}
+    - {name: hpc-logs-build-v1, days: 2, size: 128mb}
   loop_control:
     loop_var: elk_index
 
@@ -94,6 +94,14 @@
   ansible.builtin.template:
     src: logstash.yml.j2
     dest: /etc/logstash/logstash.yml
+    owner: root
+    group: logstash
+    mode: '0640'
+  notify: ELK restart Logstash
+- name: Install the versioned event normalizer
+  ansible.builtin.copy:
+    src: normalize.rb
+    dest: /etc/logstash/hpc-normalize.rb
     owner: root
     group: logstash
     mode: '0640'
@@ -212,3 +220,28 @@
   vars:
     elk_source_host: '{{ inventory_hostname }}'
 - ansible.builtin.import_tasks: verify_reader.yml
+
+- name: Read the schema-specific Kibana data view
+  ansible.builtin.uri:
+    url: http://127.0.0.1:5601/api/data_views/data_view/hpc-telemetry-v1
+    status_code: [200, 404]
+    use_proxy: false
+  register: elk_schema_view
+- name: Create or reconcile the schema-specific data view
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:5601/api/data_views/data_view{{ '/hpc-telemetry-v1' if elk_schema_view.status == 200 else '' }}"
+    method: POST
+    headers: {kbn-xsrf: hpc-core}
+    body_format: json
+    body:
+      data_view:
+        id: hpc-telemetry-v1
+        name: hpc-telemetry-v1
+        title: hpc-logs*-v1-*
+        timeFieldName: '@timestamp'
+    use_proxy: false
+  when: >-
+    elk_schema_view.status == 404 or
+    elk_schema_view.json.data_view.name | default('') != 'hpc-telemetry-v1' or
+    elk_schema_view.json.data_view.title != 'hpc-logs*-v1-*' or
+    elk_schema_view.json.data_view.timeFieldName | default('') != '@timestamp'

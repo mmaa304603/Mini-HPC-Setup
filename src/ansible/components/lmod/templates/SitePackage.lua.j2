@@ -11,7 +11,7 @@ local function report(action, t)
         local api = type(posix.syslog) == 'table' and posix.syslog or posix
         local payload = '{"event":{"dataset":"hpc.lmod","action":' .. json(action) ..
             ',"outcome":"success"},"message":' .. json(action .. ' ' .. t.modFullName) ..
-            ',"user":{"name":' .. json(os.getenv('USER')) .. '},"hpc":{"module":{"name":' ..
+            ',"user":{"name":' .. json(os.getenv('USER')) .. '},"hpc":{"schema":{"version":"1.0.0"},"module":{"name":' ..
             json(t.modFullName) .. '},"job":{"id":' .. json(os.getenv('SLURM_JOB_ID')) ..
             '},"probe":{"id":' .. json(os.getenv('HPC_LOG_PROBE')) .. '}}}'
         api.openlog('hpc-lmod')

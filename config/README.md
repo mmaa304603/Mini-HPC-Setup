@@ -66,7 +66,9 @@ in these files.
 
 `elk` is included in the default component selection. `elk_version` pins all
 four Elastic packages; `elk_retention_days` and `elk_rollover_size` control
-index lifecycle. Initial admission requires 7 GiB head RAM and 10 GiB free
+index lifecycle. `elk_cluster_id` defaults to `mini-hpc`; assign a distinct,
+stable ID to each cluster before deploying the [versioned event schema](../src/ansible/components/elk/SCHEMA.md).
+Initial admission requires 7 GiB head RAM and 10 GiB free
 under `/var/lib`; installed-stack reruns use the core disk reserve.
 Kibana and management APIs bind to loopback; TCP 5044 accepts unencrypted
 logs only on the private cluster interface. Local head users are trusted.

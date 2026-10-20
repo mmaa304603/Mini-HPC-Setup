@@ -100,6 +100,13 @@ the local regression runner. See the [component overview](../README.md) and
 
 ## ELK checks
 
+Schema v1 checks cover explicit identifier/metric mappings, versioned index
+bootstrap and repeatability, mixed legacy/new reader filters, physical evidence
+references, and distinct Ansible task statuses. The optional real Logstash test
+also exercises normalized Slurm identifiers, preserved trace context, invalid
+trace rejection, host identity preservation and stable IDs across producer retries.
+See [the schema contract and rollout](../elk/SCHEMA.md).
+
 `test_elk.py` renders loopback API/private-ingestion configuration, checks
 journal and Slurm collection, executes memory/version admission conditions in
 Ansible, and verifies that matching lifecycle/template/alias state needs no
@@ -120,3 +127,6 @@ syslog redirected to a temporary file. No live module profile is modified.
 arbitrary Elasticsearch DSL. `HPC_TEST_LOGSTASH=1` enables the installed Logstash
 stdin/stdout parsing test for real Slurm completion records and structured events;
 it uses temporary runtime paths and never contacts the live Elasticsearch service.
+The parser test uses a 512 MiB JVM heap, matching the role's minimum. On a slow
+lab host, `HPC_TEST_LOGSTASH_TIMEOUT=600` allows additional startup time (default
+300 seconds); timeouts include the captured startup diagnostics.

@@ -19,17 +19,17 @@
   when: "'spack' in core_components"
 - name: Require the Spack operation completion record
   ansible.builtin.uri:
-    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    url: http://127.0.0.1:9200/hpc-logs-v1-*/_count
     method: POST
     body_format: json
     body:
       query:
         bool:
           filter:
-            - term: {event.dataset.keyword: hpc.spack}
-            - term: {event.action.keyword: verify-end}
-            - term: {event.outcome.keyword: success}
-            - term: {hpc.probe.id.keyword: '{{ elk_probe }}'}
+            - term: {event.dataset: hpc.spack}
+            - term: {event.action: verify-end}
+            - term: {event.outcome: success}
+            - term: {hpc.probe.id: '{{ elk_probe }}'}
     use_proxy: false
   register: elk_spack_event
   until: elk_spack_event.status == 200 and (elk_spack_event.json.count | default(0) | int) > 0
@@ -45,15 +45,15 @@
   when: "'slurm' in core_components"
 - name: Require the actual Slurm completion record through its file input
   ansible.builtin.uri:
-    url: http://127.0.0.1:9200/hpc-logs-*/_count
+    url: http://127.0.0.1:9200/hpc-logs-v1-*/_count
     method: POST
     body_format: json
     body:
       query:
         bool:
           filter:
-            - term: {event.dataset.keyword: hpc.slurm.job}
-            - term: {hpc.slurm.Name.keyword: '{{ elk_probe }}'}
+            - term: {event.dataset: hpc.slurm.job}
+            - term: {hpc.job.name: '{{ elk_probe }}'}
     use_proxy: false
   register: elk_job_event
   until: elk_job_event.status == 200 and (elk_job_event.json.count | default(0) | int) > 0

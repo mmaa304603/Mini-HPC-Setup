@@ -1,0 +1,149 @@
+# Unknown fields remain in _source, but cannot grow the mapping automatically.
+# Add searchable fields deliberately and change the index generation for
+# incompatible types. IDs are strings, including Slurm array/step identifiers.
+dynamic: false
+properties:
+  '@timestamp': {type: date}
+  message: {type: text}
+  tags: {type: keyword}
+  event:
+    properties:
+      id: {type: keyword}
+      dataset: {type: keyword}
+      action: {type: keyword}
+      outcome: {type: keyword}
+      kind: {type: keyword}
+      created: {type: date}
+      ingested: {type: date}
+      duration: {type: long}
+      original: {type: keyword, index: false, doc_values: false}
+  host:
+    properties:
+      name: {type: keyword}
+      id: {type: keyword}
+      boot:
+        properties:
+          id: {type: keyword}
+  service:
+    properties:
+      name: {type: keyword}
+      version: {type: keyword}
+  trace:
+    properties:
+      id: {type: keyword}
+  span:
+    properties:
+      id: {type: keyword}
+  user:
+    properties:
+      id: {type: keyword}
+      name: {type: keyword}
+  systemd:
+    properties:
+      unit: {type: keyword}
+  log:
+    properties:
+      level: {type: keyword}
+      offset: {type: long}
+      file:
+        properties:
+          path: {type: keyword}
+      syslog:
+        properties:
+          appname: {type: keyword}
+          severity:
+            properties:
+              code: {type: long}
+  hpc:
+    properties:
+      schema:
+        properties:
+          version: {type: keyword}
+      cluster:
+        properties:
+          id: {type: keyword}
+      collector:
+        properties:
+          name: {type: keyword}
+      source:
+        properties:
+          event_id: {type: keyword}
+          host: {type: keyword}
+      node:
+        properties:
+          name: {type: keyword}
+          boot_id: {type: keyword}
+      job:
+        properties:
+          id: {type: keyword}
+          name: {type: keyword}
+          state: {type: keyword}
+          exit_code: {type: keyword}
+          nodes: {type: keyword}
+      partition: {type: keyword}
+      image:
+        properties:
+          version: {type: keyword}
+      config:
+        properties:
+          revision: {type: keyword}
+      deployment:
+        properties:
+          id: {type: keyword}
+      operation:
+        properties:
+          id: {type: keyword}
+      task:
+        properties:
+          id: {type: keyword}
+          name: {type: keyword}
+          action: {type: keyword}
+          target: {type: keyword}
+          status: {type: keyword}
+      changed: {type: boolean}
+      history_truncated: {type: boolean}
+      probe:
+        properties:
+          id: {type: keyword}
+      package:
+        properties:
+          spec: {type: keyword}
+      environment: {type: keyword}
+      module:
+        properties:
+          name: {type: keyword}
+      process:
+        properties:
+          exit_code: {type: long}
+      duration_seconds: {type: double}
+      services: {type: flattened}
+      slurm: {type: flattened}
+      memory:
+        properties:
+          MemTotal: {type: long}
+          MemAvailable: {type: long}
+          SwapTotal: {type: long}
+          SwapFree: {type: long}
+      cpu:
+        properties:
+          load_average: {type: double}
+          count: {type: long}
+      disk:
+        properties:
+          path: {type: keyword}
+          available_bytes: {type: long}
+          total_bytes: {type: long}
+      observation:
+        properties:
+          exit_code: {type: long}
+          truncated: {type: boolean}
+      diagnostic:
+        properties:
+          source: {type: keyword}
+          offset: {type: long}
+          truncated: {type: boolean}
+          original_bytes: {type: long}
+      freshness:
+        properties:
+          window_seconds: {type: long}
+          error: {type: text}

@@ -36,6 +36,7 @@ core_checkpoint_probes:
       - /etc/logstash/logstash.yml
       - /etc/logstash/pipelines.yml
       - /etc/logstash/conf.d/hpc.conf
+      - /etc/logstash/hpc-normalize.rb
       - /etc/kibana/kibana.yml
       - /etc/filebeat/filebeat.yml
       - /etc/systemd/system/logstash.service.d/hpc.conf

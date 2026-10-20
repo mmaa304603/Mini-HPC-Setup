@@ -23,6 +23,7 @@ DEFAULTS = yaml.safe_load((ELK / 'defaults/main.yml').read_text())
 class ElkTests(unittest.TestCase):
     def values(self):
         values = dict(fixture(), **DEFAULTS)
+        values['role_path'] = str(ELK)
         values['core_components'].append('elk')
         return values
 
@@ -48,7 +49,7 @@ class ElkTests(unittest.TestCase):
         pipeline = render('elk', 'logstash.conf.j2', values)
         self.assertIn('host => "10.0.0.1"', pipeline)
         self.assertIn('index => "%{[@metadata][hpc_index]}"', pipeline)
-        self.assertIn('"hpc-logs-build"', pipeline)
+        self.assertIn('"hpc-logs-build-v1"', pipeline)
         self.assertNotIn('changeme', pipeline)
         zone = ET.fromstring(render('warewulf', 'cluster-zone.xml.j2', values))
         rule = next(r for r in zone.findall('rule') if r.find('port').get('port') == '5044')
@@ -68,6 +69,7 @@ class ElkTests(unittest.TestCase):
         self.assertEqual(journal['processors'][0]['drop_event']['when.equals.systemd.unit'], 'filebeat.service')
         self.assertEqual(slurm['paths'], ['/var/log/slurm/*.log'])
         self.assertEqual(config['output.logstash']['hosts'], ['10.0.0.1:5044'])
+        self.assertIn({'add_id': None}, config['processors'])
         values['core_components'].remove('slurm')
         self.assertNotIn('hpc-slurm', [entry['id'] for entry in yaml.safe_load(render('elk', 'filebeat.yml.j2', values))['filebeat.inputs']])
 
@@ -156,16 +158,50 @@ class ElkTests(unittest.TestCase):
     def test_build_diagnostics_have_their_own_short_retention(self):
         tasks = yaml.safe_load((ELK / 'tasks/index.yml').read_text())
         values = self.values()
-        values.update(elk_index_name='hpc-logs-build', elk_index_retention=2, elk_index_rollover='128mb')
+        values.update(elk_index_name='hpc-logs-build-v1', elk_index_retention=2, elk_index_rollover='128mb')
         checks = [tasks[0], {'ansible.builtin.assert': {'that': [
             "elk_policy.phases.delete.min_age == '2d'",
             "elk_policy.phases.hot.actions.rollover.max_primary_shard_size == '128mb'",
-            "elk_index_template.priority | int == 210",
-            "elk_index_template.template.settings.index.lifecycle.rollover_alias == 'hpc-logs-build'",
-            "elk_index_template.index_patterns == ['hpc-logs-build-*']",
+            "elk_index_template.priority | int == 310",
+            "elk_index_template.template.settings.index.lifecycle.rollover_alias == 'hpc-logs-build-v1'",
+            "elk_index_template.index_patterns == ['hpc-logs-build-v1-*']",
         ]}}]
         result = self.run_tasks(checks, values)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_schema_defines_identifiers_metrics_and_safe_unknown_fields(self):
+        schema = yaml.safe_load((ELK / 'files/schema-v1.yml').read_text())
+        self.assertIs(schema['dynamic'], False)
+        def field(path):
+            node = schema
+            for name in path.split('.'):
+                node = node['properties'][name]
+            return node
+        for path in ['event.id', 'event.dataset', 'event.action', 'event.outcome',
+                     'service.name', 'trace.id', 'span.id', 'host.name',
+                     'hpc.schema.version', 'hpc.cluster.id', 'hpc.job.id',
+                     'hpc.partition', 'hpc.config.revision', 'hpc.image.version']:
+            self.assertEqual(field(path)['type'], 'keyword', path)
+        self.assertEqual(field('event.ingested')['type'], 'date')
+        self.assertEqual(field('event.duration')['type'], 'long')
+        self.assertEqual(field('hpc.memory.MemTotal')['type'], 'long')
+        self.assertEqual(field('hpc.cpu.load_average')['type'], 'double')
+        self.assertIs(field('event.original')['index'], False)
+        tasks = yaml.safe_load((ELK / 'tasks/index.yml').read_text())
+        result = self.run_tasks([tasks[0], {'ansible.builtin.assert': {'that': [
+            "elk_index_template.template.mappings.properties.event.properties.id.type == 'keyword'",
+            "elk_index_template.priority | int > 210",
+            "elk_index_template.index_patterns == ['hpc-logs-v1-*']",
+        ]}}], self.values())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_cluster_identity_is_validated_before_embedding_in_pipeline(self):
+        admission = yaml.safe_load((ELK / 'tasks/preflight.yml').read_text())[0]
+        for identity, expected in [('lab-01', True), ('bad\"identity', False), ('', False)]:
+            values = self.values()
+            values['elk_cluster_id'] = identity
+            result = self.run_tasks([admission], values)
+            self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
 
     def test_bootstrap_sends_rendered_alias_keys_and_skips_existing_alias(self):
         requests = []
@@ -187,14 +223,14 @@ class ElkTests(unittest.TestCase):
         thread.start()
         try:
             bootstrap = yaml.safe_load((ELK / 'tasks/index.yml').read_text())[-1]
-            for name in ['hpc-logs', 'hpc-logs-build']:
+            for name in ['hpc-logs-v1', 'hpc-logs-build-v1']:
                 with self.subTest(name=name):
                     task = copy.deepcopy(bootstrap)
                     uri = task['ansible.builtin.uri']
                     uri['url'] = uri['url'].replace(':9200/', ':' + str(server.server_port) + '/')
                     values = self.values()
                     values['elk_alias'] = {'status': 404}
-                    if name != 'hpc-logs':
+                    if name != 'hpc-logs-v1':
                         values['elk_index_name'] = name
                     result = self.run_tasks([task], values)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -214,7 +250,7 @@ class ElkTests(unittest.TestCase):
         # Exercise actual Ansible conditions with canonical Elasticsearch responses.
         tasks = yaml.safe_load((ELK / 'tasks/index.yml').read_text())
         read_policy = {'ansible.builtin.set_fact': {
-            'elk_policy_read': {'status': 200, 'json': {'hpc-logs': {'policy': "{{ elk_policy | combine({'phases': {'hot': {'actions': {'rollover': {'min_docs': 1}}}}}, recursive=True) }}"}}},
+            'elk_policy_read': {'status': 200, 'json': {'hpc-logs-v1': {'policy': "{{ elk_policy | combine({'phases': {'hot': {'actions': {'rollover': {'min_docs': 1}}}}}, recursive=True) }}"}}},
             'elk_template_read': {'status': 200, 'json': {'index_templates': [{'index_template': "{{ elk_index_template | combine({'created_date_millis': 12345, 'modified_date_millis': 67890}) }}"}]}},
             'elk_alias': {'status': 200},
         }}

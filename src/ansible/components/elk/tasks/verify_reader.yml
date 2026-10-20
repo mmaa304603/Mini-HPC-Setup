@@ -22,7 +22,13 @@
     body: {dataset: hpc.probe, message: '{{ elk_probe }}', limit: 1}
     use_proxy: false
   register: elk_reader_probe
-  until: elk_reader_probe.status == 200 and elk_reader_probe.json.records | default([]) | length > 0
+  until: >-
+    elk_reader_probe.status == 200 and
+    elk_reader_probe.json.records | default([]) | length > 0 and
+    elk_reader_probe.json.evidence | default([]) | length > 0 and
+    elk_reader_probe.json.records[0].hpc.schema.version == '1.0.0' and
+    elk_reader_probe.json.evidence[0].event_id == elk_reader_probe.json.records[0].event.id and
+    elk_reader_probe.json.evidence[0].document_id == elk_reader_probe.json.records[0].event.id
   retries: 12
   delay: 5
   no_log: true

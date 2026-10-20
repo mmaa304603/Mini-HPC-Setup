@@ -1,5 +1,10 @@
 # ELK logging
 
+New events use the [versioned telemetry schema](SCHEMA.md), explicit mappings
+and stable evidence IDs. In Kibana, use **hpc-telemetry-v1** for new data; the
+existing **hpc-logs** view also includes historical indexes. The read-only
+broker returns physical evidence references alongside its records.
+
 The core workflow installs Elasticsearch, Logstash, Kibana and Filebeat on the
 Rocky 9 head, and Filebeat plus the lightweight observation timer in the CPU image. ELK is included in
 `config/group_vars/all.yml` and the core defaults. Setup and the shell installer
@@ -42,7 +47,11 @@ elk_kibana_heap_mb: 2048
 elk_pipeline_workers: 1
 elk_retention_days: 7
 elk_rollover_size: 1gb
+elk_cluster_id: mini-hpc
 ```
+
+Set a distinct, stable `elk_cluster_id` for each cluster. It is included in event
+identity and validated before being embedded in Logstash configuration.
 
 All four RPMs use the same version. Existing mismatched versions cause a
 preflight failure; upgrading an existing Elastic database is an explicit

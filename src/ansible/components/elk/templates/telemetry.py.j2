@@ -35,9 +35,12 @@ def scrub(value):
 
 
 def record(dataset, action, outcome='unknown', message='', **details):
+    event = {'id': uuid.uuid4().hex, 'dataset': dataset, 'action': action, 'outcome': outcome}
+    if 'duration_seconds' in details:
+        event['duration'] = round(details['duration_seconds'] * 1_000_000_000)
     return {'@timestamp': datetime.now(timezone.utc).isoformat(),
-            'event': {'id': uuid.uuid4().hex, 'dataset': dataset, 'action': action, 'outcome': outcome},
-            'message': clean(message)[:8192], 'hpc': scrub(details),
+            'event': event,
+            'message': clean(message)[:8192], 'hpc': dict(scrub(details), schema={'version': '1.0.0'}),
             'host': {'name': socket.gethostname()},
             'user': {'id': str(os.getuid()), 'name': pwd.getpwuid(os.getuid()).pw_name}}
 
@@ -185,11 +188,11 @@ def snapshot(config, output):
         # Independent of a quiet service: require a recent heartbeat from every expected node.
         for expected in config['nodes']:
             query = {'query': {'bool': {'filter': [
-                {'term': {'event.dataset.keyword': 'hpc.health'}},
-                {'term': {'hpc.node.name.keyword': expected}},
+                {'term': {'event.dataset': 'hpc.health'}},
+                {'term': {'hpc.node.name': expected}},
                 {'range': {'@timestamp': {'gte': 'now-3m'}}}]}}}
             try:
-                request = urllib.request.Request('http://127.0.0.1:9200/hpc-logs-*/_count',
+                request = urllib.request.Request('http://127.0.0.1:9200/hpc-logs-v1-*/_count',
                     data=json.dumps({'query': query['query']}).encode(), headers={'Content-Type': 'application/json'})
                 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
                 with opener.open(request, timeout=5) as response:
